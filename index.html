@@ -1122,8 +1122,14 @@
             opacity: 0.5;
             font-size: 0.75rem;
         }
-
+        
         /* Share Image Editor Enhancements */
+        #share-image-preview {
+            resize: both;
+            overflow: auto;
+            border: 2px dashed var(--primary);
+        }
+
         .draggable-element {
             position: absolute;
             cursor: grab;
@@ -1342,13 +1348,13 @@
                         <i class="fas fa-book-quran text-xl mb-1"></i>
                         <span class="text-xs">المصحف</span>
                     </button>
-                    <button class="nav-item" onclick="App.startMemorizationMode('page')">
-                        <i class="fas fa-brain text-xl mb-1"></i>
-                        <span class="text-xs">الحفظ</span>
-                    </button>
                     <button class="nav-item" data-panel="index-panel">
                         <i class="fas fa-list text-xl mb-1"></i>
                         <span class="text-xs">الفهرس</span>
+                    </button>
+                    <button class="nav-item" data-panel="bookmarks-panel">
+                        <i class="fas fa-bookmark text-xl mb-1"></i>
+                        <span class="text-xs">المفضلة</span>
                     </button>
                     <button class="nav-item" data-panel="khatmah-panel">
                         <i class="fas fa-chart-line text-xl mb-1"></i>
@@ -1556,13 +1562,6 @@
                 <div>
                     <h4 class="font-bold">التسبيح</h4>
                     <p class="text-xs" style="color: var(--text-secondary)">عداد التسبيح الإلكتروني</p>
-                </div>
-            </div>
-            <div class="menu-item" onclick="App.openPanel('bookmarks-panel')">
-                <i class="fas fa-bookmark"></i>
-                <div>
-                    <h4 class="font-bold">المفضلة</h4>
-                    <p class="text-xs" style="color: var(--text-secondary)">الآيات التي حفظتها</p>
                 </div>
             </div>
             <div id="install-app-item" class="menu-item" style="display: none;">
@@ -6611,7 +6610,7 @@
             const [surahId, ayahNum] = state.selectedAyah.key.split(':');
             const surah = state.surahs.find(s => s.id == surahId);
             
-            const shareText = `${state.selectedAyah.text}\n\nسورة ${surah?.name_arabic || ''} - آية ${ayahNum}\n\nمصحف الهادي`;
+            const shareText = `${state.selectedAyah.text}\n\nسورة ${surah?.name_arabic || ''} - آية ${ayahNum}\n\nبصائر`;
             
             if (navigator.share) {
                 navigator.share({
@@ -6626,15 +6625,15 @@
         
         prepareShareImage() {
             if (!state.selectedAyah) return;
-
+        
             const [surahId, ayahNum] = state.selectedAyah.key.split(':');
             const surah = state.surahs.find(s => s.id == surahId);
-
+        
             // Reset elements
             const textWrapper = document.getElementById('share-text-wrapper');
             const infoWrapper = document.getElementById('share-info-wrapper');
             const watermarkWrapper = document.getElementById('watermark-wrapper');
-
+        
             // Make them visible and reset positions
             [textWrapper, infoWrapper, watermarkWrapper].forEach(el => {
                 el.style.display = 'block';
@@ -6642,10 +6641,10 @@
                 el.style.top = 'auto';
                 el.style.left = 'auto';
             });
-
+        
             document.getElementById('share-text').textContent = state.selectedAyah.text;
             document.getElementById('share-info').textContent = `سورة ${surah?.name_arabic || ''} - آية ${ayahNum}`;
-
+        
             this.updateSharePreview();
             this.openPanel('share-image-panel');
         },
@@ -6656,13 +6655,6 @@
             preview.style.color = state.shareSettings.textColor;
             preview.style.fontFamily = state.shareSettings.fontFamily;
             document.getElementById('share-text').style.fontSize = state.shareSettings.fontSize + 'px';
-
-            const shareText = document.getElementById('share-text');
-            if (document.getElementById('share-text-shadow').checked) {
-                shareText.classList.add('text-shadow');
-            } else {
-                shareText.classList.remove('text-shadow');
-            }
         },
         
         async generateShareImage(download = false) {
@@ -6850,7 +6842,7 @@
             const panel = document.getElementById(panelId);
             if (panel) {
                 panel.classList.remove('visible');
-                document.body.classList.remove('modal-open');
+                 document.body.classList.remove('modal-open');
                 
                 document.querySelectorAll('.nav-item').forEach(item => {
                     item.classList.toggle('active', item.dataset.panel === 'home');
@@ -6974,7 +6966,6 @@
                     
                     menu.classList.remove('hidden');
                     backdrop.classList.remove('hidden');
-                    document.body.classList.add('modal-open');
                     setTimeout(() => {
                         menu.style.transform = 'translateY(0)';
                     }, 10);
@@ -7253,7 +7244,6 @@
             document.getElementById('ayah-share').addEventListener('click', () => {
                 const modal = document.getElementById('share-options-modal');
                 modal.classList.add('active');
-                document.body.classList.add('modal-open');
                 document.getElementById('ayah-menu-backdrop').click();
             });
             
@@ -7288,7 +7278,6 @@
             
             document.getElementById('close-share-modal').addEventListener('click', () => {
                 document.getElementById('share-options-modal').classList.remove('active');
-                document.body.classList.remove('modal-open');
             });
             
             // Share image customization
@@ -7320,34 +7309,37 @@
                 state.shareSettings.fontFamily = e.target.value;
                 this.updateSharePreview();
             });
-            
+
             document.getElementById('share-text-shadow').addEventListener('change', () => {
                 this.updateSharePreview();
             });
-
-            // Make text draggable
+            
+            // Make elements draggable
             let isDragging = false;
             let currentDraggable = null;
             let offsetX, offsetY;
-
+            
             const previewContainer = document.getElementById('share-image-preview');
-
+            
             const makeDraggable = (el) => {
                 el.addEventListener('mousedown', (e) => {
+                    if (e.target.classList.contains('delete-btn')) return;
                     isDragging = true;
                     currentDraggable = el;
-                    offsetX = e.clientX - el.offsetLeft;
-                    offsetY = e.clientY - el.offsetTop;
+                    // Use getBoundingClientRect for accuracy with scaled/transformed elements
+                    const rect = el.getBoundingClientRect();
+                    const containerRect = previewContainer.getBoundingClientRect();
+                    offsetX = e.clientX - (rect.left - containerRect.left);
+                    offsetY = e.clientY - (rect.top - containerRect.top);
                     el.style.cursor = 'grabbing';
                     el.style.zIndex = 1000;
                 });
             };
-
+            
             makeDraggable(document.getElementById('share-text-wrapper'));
             makeDraggable(document.getElementById('share-info-wrapper'));
             makeDraggable(document.getElementById('watermark-wrapper'));
-
-            // Add delete functionality
+            
             document.querySelectorAll('.delete-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     e.stopPropagation();
@@ -7360,26 +7352,19 @@
                     e.preventDefault();
                     let newX = e.clientX - offsetX;
                     let newY = e.clientY - offsetY;
-
-                    // Constrain within the preview box
-                    const containerRect = previewContainer.getBoundingClientRect();
+            
                     const elRect = currentDraggable.getBoundingClientRect();
+                    const containerRect = previewContainer.getBoundingClientRect();
 
-                    const parentX = containerRect.left;
-                    const parentY = containerRect.top;
-
-                    let finalX = e.clientX - parentX - (elRect.width / 2);
-                    let finalY = e.clientY - parentY - (elRect.height / 2);
-
-                    finalX = Math.max(0, Math.min(finalX, containerRect.width - elRect.width));
-                    finalY = Math.max(0, Math.min(finalY, containerRect.height - elRect.height));
-
-                    currentDraggable.style.left = `${finalX}px`;
-                    currentDraggable.style.top = `${finalY}px`;
-                    currentDraggable.style.position = 'absolute';
+                    // Constrain movement within the preview container
+                    newX = Math.max(0, Math.min(newX, containerRect.width - elRect.width));
+                    newY = Math.max(0, Math.min(newY, containerRect.height - elRect.height));
+            
+                    currentDraggable.style.left = `${newX}px`;
+                    currentDraggable.style.top = `${newY}px`;
                 }
             });
-
+            
             document.addEventListener('mouseup', () => {
                 if (isDragging) {
                     isDragging = false;
@@ -7391,7 +7376,7 @@
                 }
             });
 
-
+            
             // Share and Download buttons
             document.getElementById('generate-share-image').addEventListener('click', () => {
                 this.generateShareImage(false); // Share
