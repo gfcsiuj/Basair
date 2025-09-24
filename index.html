@@ -3,25 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="description" content="مصحف الهادي - تطبيق قرآني متكامل مع التفسير والترجمة والاستماع للقراء المختلفين">
-    <meta name="keywords" content="قرآن, مصحف, تفسير, ترجمة, تلاوة, إسلام, قرآن كريم, مصحف إلكتروني">
-    <meta name="author" content="مصحف الهادي">
+    <meta name="description" content="بصائر - تطبيق قرآني متكامل مع التفسير والترجمة والاستماع للقراء المختلفين">
+    <meta name="keywords" content="قرآن, مصحف, تفسير, ترجمة, تلاوة, إسلام, قرآن كريم, مصحف إلكتروني, بصائر">
+    <meta name="author" content="بصائر">
     <meta name="theme-color" content="#059669">
     
     <!-- PWA Meta Tags -->
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="مصحف الهادي">
-    <meta name="application-name" content="مصحف الهادي">
+    <meta name="apple-mobile-web-app-title" content="بصائر">
+    <meta name="application-name" content="بصائر">
     
     <!-- PWA Manifest -->
     <link rel="manifest" href="./manifest.json">
     
-    <title>مصحف الهادي - القرآن الكريم</title>
+    <title>بصائر - القرآن الكريم</title>
     
     <!-- Favicon -->
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23059669;stop-opacity:1' /%3E%3Cstop offset='100%25' style='stop-color:%2310b981;stop-opacity:1' /%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' fill='url(%23grad)' rx='20'/%3E%3Ctext x='50' y='50' text-anchor='middle' dy='.3em' fill='white' font-size='45' font-family='Arial' font-weight='bold'%3E%D9%85%3C/text%3E%3C/svg%3E">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23059669;stop-opacity:1' /%3E%3Cstop offset='100%25' style='stop-color:%2310b981;stop-opacity:1' /%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' fill='url(%23grad)' rx='20'/%3E%3Ctext x='50' y='50' text-anchor='middle' dy='.3em' fill='white' font-size='45' font-family='Arial' font-weight='bold'%3E%D8%A8%3C/text%3E%3C/svg%3E">
     
     <!-- Google Fonts - المزيد من الخطوط -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -157,6 +157,9 @@
             overscroll-behavior: none;
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
+        }
+        body.modal-open #main-content {
+            overflow-y: hidden;
         }
         
         /* Custom Scrollbar */
@@ -1119,6 +1122,42 @@
             opacity: 0.5;
             font-size: 0.75rem;
         }
+
+        /* Share Image Editor Enhancements */
+        .draggable-element {
+            position: absolute;
+            cursor: grab;
+            padding: 8px;
+            border: 1px dashed transparent;
+            transition: border-color 0.2s;
+        }
+        .draggable-element:hover {
+            border-color: var(--primary);
+        }
+        .draggable-element .delete-btn {
+            position: absolute;
+            top: -8px;
+            left: -8px; /* RTL-friendly top-right */
+            width: 20px;
+            height: 20px;
+            background: #ef4444;
+            color: white;
+            border-radius: 50%;
+            border: 1px solid white;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            line-height: 1;
+            cursor: pointer;
+            z-index: 10;
+        }
+        .draggable-element:hover .delete-btn {
+            display: flex;
+        }
+        .text-shadow {
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
         
         /* Swipe Hints */
         .swipe-hint {
@@ -1310,10 +1349,6 @@
                     <button class="nav-item" data-panel="index-panel">
                         <i class="fas fa-list text-xl mb-1"></i>
                         <span class="text-xs">الفهرس</span>
-                    </button>
-                    <button class="nav-item" data-panel="bookmarks-panel">
-                        <i class="fas fa-bookmark text-xl mb-1"></i>
-                        <span class="text-xs">المفضلة</span>
                     </button>
                     <button class="nav-item" data-panel="khatmah-panel">
                         <i class="fas fa-chart-line text-xl mb-1"></i>
@@ -1523,6 +1558,20 @@
                     <p class="text-xs" style="color: var(--text-secondary)">عداد التسبيح الإلكتروني</p>
                 </div>
             </div>
+            <div class="menu-item" onclick="App.openPanel('bookmarks-panel')">
+                <i class="fas fa-bookmark"></i>
+                <div>
+                    <h4 class="font-bold">المفضلة</h4>
+                    <p class="text-xs" style="color: var(--text-secondary)">الآيات التي حفظتها</p>
+                </div>
+            </div>
+            <div id="install-app-item" class="menu-item" style="display: none;">
+                <i class="fas fa-download"></i>
+                <div>
+                    <h4 class="font-bold">تثبيت التطبيق</h4>
+                    <p class="text-xs" style="color: var(--text-secondary)">ثبت التطبيق على جهازك</p>
+                </div>
+            </div>
             <div class="menu-item" onclick="App.openPanel('notes-panel')">
                 <i class="fas fa-sticky-note"></i>
                 <div>
@@ -1601,10 +1650,19 @@
         </div>
         <div class="flex-1 overflow-y-auto p-4">
             <!-- Image Preview -->
-            <div id="share-image-preview" class="mb-4">
-                <p id="share-text" class="font-arabic text-2xl mb-4"></p>
-                <p id="share-info" class="text-sm mb-4"></p>
-                <p class="watermark">مصحف الهادي</p>
+            <div id="share-image-preview" class="mb-4 relative overflow-hidden">
+                <div id="share-text-wrapper" class="draggable-element">
+                    <button class="delete-btn">&times;</button>
+                    <p id="share-text" class="font-arabic text-2xl"></p>
+                </div>
+                <div id="share-info-wrapper" class="draggable-element">
+                    <button class="delete-btn">&times;</button>
+                    <p id="share-info" class="text-sm"></p>
+                </div>
+                <div id="watermark-wrapper" class="draggable-element">
+                    <button class="delete-btn">&times;</button>
+                    <p class="watermark">بصائر</p>
+                </div>
             </div>
             
             <!-- Customization Options -->
@@ -1656,6 +1714,10 @@
                     </select>
                 </div>
                 
+                <div class="flex items-center justify-between">
+                    <label class="text-sm">إضافة ظل للنص</label>
+                    <input type="checkbox" id="share-text-shadow" class="checkbox">
+                </div>
                 <div class="flex gap-2">
                     <button id="generate-share-image" class="btn btn-primary flex-1">
                         <i class="fas fa-share"></i>
@@ -2065,6 +2127,7 @@
         pageData: null,
         selectedAyah: null,
         isPlaying: false,
+        autoplayOnLoad: false,
         currentAudioIndex: 0,
         audioQueue: [],
         bookmarks: JSON.parse(localStorage.getItem('bookmarks')) || [],
@@ -2404,6 +2467,17 @@
                 this.renderPage();
                 this.setupAudio();
                 this.trackPageInKhatmah(pageNumber);
+
+                if (state.autoplayOnLoad) {
+                    const audioEl = document.getElementById('page-audio');
+                    audioEl.play();
+                    this.highlightPlayingAyah();
+                    state.autoplayOnLoad = false; // Reset the flag
+                }
+
+                if (state.memorizationMode) {
+                    this.startMemorizationMode('page');
+                }
                 
                 console.log('Page loaded successfully with', verses.length, 'verses');
             } catch (error) {
@@ -4943,7 +5017,12 @@
         // 🔍 Process Interim Sequence (for partial results)
         processInterimSequence(transcript, confidence) {
             const normalizedTranscript = this.normalizeArabicText(transcript);
+            const feedbackEl = document.getElementById('speech-interim-feedback');
             
+            if (feedbackEl) {
+                feedbackEl.textContent = `جاري الاستماع: ${transcript}`;
+            }
+
             // Show interim feedback with sequence preview
             if (state.memorizationStats.currentWordIndex < state.currentMemorizationWords.length) {
                 const remainingWords = state.currentMemorizationWords.slice(state.memorizationStats.currentWordIndex, state.memorizationStats.currentWordIndex + 3);
@@ -5980,6 +6059,13 @@
                 const audioEl = document.getElementById('page-audio');
                 audioEl.src = state.audioQueue[state.currentAudioIndex].url;
                 audioEl.play();
+                this.highlightPlayingAyah();
+            } else {
+                // End of page, go to next page and autoplay
+                if (state.currentPage < CONFIG.TOTAL_PAGES) {
+                    state.autoplayOnLoad = true;
+                    this.loadPage(state.currentPage + 1);
+                }
             }
         },
         
@@ -6540,13 +6626,26 @@
         
         prepareShareImage() {
             if (!state.selectedAyah) return;
-            
+
             const [surahId, ayahNum] = state.selectedAyah.key.split(':');
             const surah = state.surahs.find(s => s.id == surahId);
-            
+
+            // Reset elements
+            const textWrapper = document.getElementById('share-text-wrapper');
+            const infoWrapper = document.getElementById('share-info-wrapper');
+            const watermarkWrapper = document.getElementById('watermark-wrapper');
+
+            // Make them visible and reset positions
+            [textWrapper, infoWrapper, watermarkWrapper].forEach(el => {
+                el.style.display = 'block';
+                el.style.position = 'relative';
+                el.style.top = 'auto';
+                el.style.left = 'auto';
+            });
+
             document.getElementById('share-text').textContent = state.selectedAyah.text;
             document.getElementById('share-info').textContent = `سورة ${surah?.name_arabic || ''} - آية ${ayahNum}`;
-            
+
             this.updateSharePreview();
             this.openPanel('share-image-panel');
         },
@@ -6557,6 +6656,13 @@
             preview.style.color = state.shareSettings.textColor;
             preview.style.fontFamily = state.shareSettings.fontFamily;
             document.getElementById('share-text').style.fontSize = state.shareSettings.fontSize + 'px';
+
+            const shareText = document.getElementById('share-text');
+            if (document.getElementById('share-text-shadow').checked) {
+                shareText.classList.add('text-shadow');
+            } else {
+                shareText.classList.remove('text-shadow');
+            }
         },
         
         async generateShareImage(download = false) {
@@ -6726,6 +6832,7 @@
             const panel = document.getElementById(panelId);
             if (panel) {
                 panel.classList.add('visible');
+                document.body.classList.add('modal-open');
                 
                 document.querySelectorAll('.nav-item').forEach(item => {
                     item.classList.toggle('active', item.dataset.panel === panelId);
@@ -6743,6 +6850,7 @@
             const panel = document.getElementById(panelId);
             if (panel) {
                 panel.classList.remove('visible');
+                document.body.classList.remove('modal-open');
                 
                 document.querySelectorAll('.nav-item').forEach(item => {
                     item.classList.toggle('active', item.dataset.panel === 'home');
@@ -6866,6 +6974,7 @@
                     
                     menu.classList.remove('hidden');
                     backdrop.classList.remove('hidden');
+                    document.body.classList.add('modal-open');
                     setTimeout(() => {
                         menu.style.transform = 'translateY(0)';
                     }, 10);
@@ -6878,6 +6987,7 @@
                 const backdrop = document.getElementById('ayah-menu-backdrop');
                 
                 menu.style.transform = 'translateY(100%)';
+                document.body.classList.remove('modal-open');
                 setTimeout(() => {
                     menu.classList.add('hidden');
                     backdrop.classList.add('hidden');
@@ -7117,6 +7227,7 @@
                         `;
                         
                         document.getElementById('tafsir-popup').style.display = 'flex';
+                        document.body.classList.add('modal-open');
                     } catch (error) {
                         console.error('Error loading tafsir:', error);
                         this.showToast('حدث خطأ في تحميل التفسير', 'error');
@@ -7128,6 +7239,7 @@
             
             document.getElementById('close-tafsir').addEventListener('click', () => {
                 document.getElementById('tafsir-popup').style.display = 'none';
+                document.body.classList.remove('modal-open');
             });
             
             document.getElementById('ayah-bookmark').addEventListener('click', () => {
@@ -7141,6 +7253,7 @@
             document.getElementById('ayah-share').addEventListener('click', () => {
                 const modal = document.getElementById('share-options-modal');
                 modal.classList.add('active');
+                document.body.classList.add('modal-open');
                 document.getElementById('ayah-menu-backdrop').click();
             });
             
@@ -7175,6 +7288,7 @@
             
             document.getElementById('close-share-modal').addEventListener('click', () => {
                 document.getElementById('share-options-modal').classList.remove('active');
+                document.body.classList.remove('modal-open');
             });
             
             // Share image customization
@@ -7207,6 +7321,77 @@
                 this.updateSharePreview();
             });
             
+            document.getElementById('share-text-shadow').addEventListener('change', () => {
+                this.updateSharePreview();
+            });
+
+            // Make text draggable
+            let isDragging = false;
+            let currentDraggable = null;
+            let offsetX, offsetY;
+
+            const previewContainer = document.getElementById('share-image-preview');
+
+            const makeDraggable = (el) => {
+                el.addEventListener('mousedown', (e) => {
+                    isDragging = true;
+                    currentDraggable = el;
+                    offsetX = e.clientX - el.offsetLeft;
+                    offsetY = e.clientY - el.offsetTop;
+                    el.style.cursor = 'grabbing';
+                    el.style.zIndex = 1000;
+                });
+            };
+
+            makeDraggable(document.getElementById('share-text-wrapper'));
+            makeDraggable(document.getElementById('share-info-wrapper'));
+            makeDraggable(document.getElementById('watermark-wrapper'));
+
+            // Add delete functionality
+            document.querySelectorAll('.delete-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    e.target.closest('.draggable-element').style.display = 'none';
+                });
+            });
+
+            previewContainer.addEventListener('mousemove', (e) => {
+                if (isDragging && currentDraggable) {
+                    e.preventDefault();
+                    let newX = e.clientX - offsetX;
+                    let newY = e.clientY - offsetY;
+
+                    // Constrain within the preview box
+                    const containerRect = previewContainer.getBoundingClientRect();
+                    const elRect = currentDraggable.getBoundingClientRect();
+
+                    const parentX = containerRect.left;
+                    const parentY = containerRect.top;
+
+                    let finalX = e.clientX - parentX - (elRect.width / 2);
+                    let finalY = e.clientY - parentY - (elRect.height / 2);
+
+                    finalX = Math.max(0, Math.min(finalX, containerRect.width - elRect.width));
+                    finalY = Math.max(0, Math.min(finalY, containerRect.height - elRect.height));
+
+                    currentDraggable.style.left = `${finalX}px`;
+                    currentDraggable.style.top = `${finalY}px`;
+                    currentDraggable.style.position = 'absolute';
+                }
+            });
+
+            document.addEventListener('mouseup', () => {
+                if (isDragging) {
+                    isDragging = false;
+                    if (currentDraggable) {
+                        currentDraggable.style.cursor = 'grab';
+                        currentDraggable.style.zIndex = 'auto';
+                        currentDraggable = null;
+                    }
+                }
+            });
+
+
             // Share and Download buttons
             document.getElementById('generate-share-image').addEventListener('click', () => {
                 this.generateShareImage(false); // Share
@@ -7367,11 +7552,16 @@
             // عند استقبال نص من الخدمة
             assemblyAiSocket.onmessage = (message) => {
                 const result = JSON.parse(message.data);
-                // نحن نهتم فقط بالنتائج النهائية لضمان الدقة
-                if (result.text && result.message_type === 'FinalTranscript') {
-                    console.log("API Response:", result.text);
-                    // استدعاء دالة معالجة النص الموجودة في تطبيقك
-                    App.processSequentialText(result.text, 1.0, performance.now());
+                if (!result.text) {
+                    return;
+                }
+
+                if (result.message_type === 'PartialTranscript' && result.text) {
+                    console.log("Partial: ", result.text);
+                    App.processInterimSequence(result.text, result.confidence || 0.7);
+                } else if (result.message_type === 'FinalTranscript' && result.text) {
+                    console.log("Final: ", result.text);
+                    App.processSequentialText(result.text, result.confidence || 1.0, performance.now());
                 }
             };
     
@@ -7413,6 +7603,26 @@
     // Make App globally accessible
     window.App = App;
     
+    let deferredPrompt;
+    const installAppItem = document.getElementById('install-app-item');
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      installAppItem.style.display = 'flex';
+    });
+
+    installAppItem.addEventListener('click', async () => {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+          installAppItem.style.display = 'none';
+        }
+        deferredPrompt = null;
+      }
+    });
+
     // Initialize app when DOM is ready
     document.addEventListener('DOMContentLoaded', () => {
         App.init();
