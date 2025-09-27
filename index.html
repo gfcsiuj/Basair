@@ -1,27 +1,28 @@
+
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="description" content="بصائر - تطبيق قرآني متكامل مع التفسير والترجمة والاستماع للقراء المختلفين">
-    <meta name="keywords" content="قرآن, مصحف, تفسير, ترجمة, تلاوة, إسلام, قرآن كريم, مصحف إلكتروني, بصائر">
-    <meta name="author" content="بصائر">
+    <meta name="description" content="مصحف الهادي - تطبيق قرآني متكامل مع التفسير والترجمة والاستماع للقراء المختلفين">
+    <meta name="keywords" content="قرآن, مصحف, تفسير, ترجمة, تلاوة, إسلام, قرآن كريم, مصحف إلكتروني">
+    <meta name="author" content="مصحف الهادي">
     <meta name="theme-color" content="#059669">
     
     <!-- PWA Meta Tags -->
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="بصائر">
-    <meta name="application-name" content="بصائر">
+    <meta name="apple-mobile-web-app-title" content="مصحف الهادي">
+    <meta name="application-name" content="مصحف الهادي">
     
     <!-- PWA Manifest -->
     <link rel="manifest" href="./manifest.json">
     
-    <title>بصائر - القرآن الكريم</title>
+    <title>مصحف الهادي - القرآن الكريم</title>
     
     <!-- Favicon -->
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23059669;stop-opacity:1' /%3E%3Cstop offset='100%25' style='stop-color:%2310b981;stop-opacity:1' /%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' fill='url(%23grad)' rx='20'/%3E%3Ctext x='50' y='50' text-anchor='middle' dy='.3em' fill='white' font-size='45' font-family='Arial' font-weight='bold'%3E%D8%A8%3C/text%3E%3C/svg%3E">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23059669;stop-opacity:1' /%3E%3Cstop offset='100%25' style='stop-color:%2310b981;stop-opacity:1' /%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' fill='url(%23grad)' rx='20'/%3E%3Ctext x='50' y='50' text-anchor='middle' dy='.3em' fill='white' font-size='45' font-family='Arial' font-weight='bold'%3E%D9%85%3C/text%3E%3C/svg%3E">
     
     <!-- Google Fonts - المزيد من الخطوط -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -53,6 +54,9 @@
     <!-- Html2Canvas -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     
+    <!-- Interact.js for Share Image Editor -->
+    <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
+
     <!-- Chart.js for analytics -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
@@ -148,7 +152,7 @@
             font-family: var(--font-ui);
             background: var(--bg-primary);
             color: var(--text-primary);
-            overflow: hidden;
+            overflow: auto;
             direction: rtl;
             text-align: right;
             height: 100vh;
@@ -158,10 +162,12 @@
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
         }
-        body.modal-open #main-content {
-            overflow-y: hidden;
+
+        /* Prevent body scroll when a panel is open */
+        body.panel-open {
+            overflow: hidden;
         }
-        
+
         /* Custom Scrollbar */
         .custom-scrollbar::-webkit-scrollbar {
             width: 6px;
@@ -317,22 +323,6 @@
             100% { transform: translateX(100%); }
         }
 
-        /* Animations */
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-        
-        @keyframes slideUp {
-            from { transform: translateY(20px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-        
-        @keyframes slideDown {
-            from { transform: translateY(-20px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-        
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
@@ -795,6 +785,8 @@
             background: var(--bg-primary);
             transform: translateY(100%);
             transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
         }
         
         .panel.visible {
@@ -1123,48 +1115,6 @@
             font-size: 0.75rem;
         }
         
-        /* Share Image Editor Enhancements */
-        #share-image-preview {
-            resize: both;
-            overflow: auto;
-            border: 2px dashed var(--primary);
-        }
-
-        .draggable-element {
-            position: absolute;
-            cursor: grab;
-            padding: 8px;
-            border: 1px dashed transparent;
-            transition: border-color 0.2s;
-        }
-        .draggable-element:hover {
-            border-color: var(--primary);
-        }
-        .draggable-element .delete-btn {
-            position: absolute;
-            top: -8px;
-            left: -8px; /* RTL-friendly top-right */
-            width: 20px;
-            height: 20px;
-            background: #ef4444;
-            color: white;
-            border-radius: 50%;
-            border: 1px solid white;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            font-size: 14px;
-            line-height: 1;
-            cursor: pointer;
-            z-index: 10;
-        }
-        .draggable-element:hover .delete-btn {
-            display: flex;
-        }
-        .text-shadow {
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-        }
-        
         /* Swipe Hints */
         .swipe-hint {
             position: fixed;
@@ -1348,18 +1298,18 @@
                         <i class="fas fa-book-quran text-xl mb-1"></i>
                         <span class="text-xs">المصحف</span>
                     </button>
+                    <button class="nav-item" onclick="App.startMemorizationMode('page')">
+                        <i class="fas fa-brain text-xl mb-1"></i>
+                        <span class="text-xs">الحفظ</span>
+                    </button>
                     <button class="nav-item" data-panel="index-panel">
                         <i class="fas fa-list text-xl mb-1"></i>
                         <span class="text-xs">الفهرس</span>
                     </button>
-                    <button class="nav-item" data-panel="bookmarks-panel">
-                        <i class="fas fa-bookmark text-xl mb-1"></i>
-                        <span class="text-xs">المفضلة</span>
-                    </button>
-                    <button class="nav-item" data-panel="khatmah-panel">
-                        <i class="fas fa-chart-line text-xl mb-1"></i>
-                        <span class="text-xs">الختمة</span>
-                    </button>
+                <button class="nav-item" data-panel="bookmarks-panel">
+                    <i class="fas fa-bookmark text-xl mb-1"></i>
+                    <span class="text-xs">المفضلة</span>
+                </button>
                     <button class="nav-item" data-panel="settings-panel">
                         <i class="fas fa-cog text-xl mb-1"></i>
                         <span class="text-xs">الإعدادات</span>
@@ -1550,6 +1500,20 @@
                     <p class="text-xs" style="color: var(--text-secondary)">تابع تقدمك في القراءة</p>
                 </div>
             </div>
+            <div class="menu-item" onclick="App.openPanel('khatmah-panel')">
+                <i class="fas fa-chart-line"></i>
+                <div>
+                    <h4 class="font-bold">الختمات</h4>
+                    <p class="text-xs" style="color: var(--text-secondary)">أنشئ وتابع ختماتك للقرآن</p>
+                </div>
+            </div>
+            <div class="menu-item" onclick="App.openPanel('bookmarks-panel')">
+                <i class="fas fa-bookmark"></i>
+                <div>
+                    <h4 class="font-bold">المفضلة</h4>
+                    <p class="text-xs" style="color: var(--text-secondary)">الآيات التي قمت بحفظها</p>
+                </div>
+            </div>
             <div class="menu-item" onclick="App.openPanel('duas-panel')">
                 <i class="fas fa-hands-praying"></i>
                 <div>
@@ -1562,13 +1526,6 @@
                 <div>
                     <h4 class="font-bold">التسبيح</h4>
                     <p class="text-xs" style="color: var(--text-secondary)">عداد التسبيح الإلكتروني</p>
-                </div>
-            </div>
-            <div id="install-app-item" class="menu-item" style="display: none;">
-                <i class="fas fa-download"></i>
-                <div>
-                    <h4 class="font-bold">تثبيت التطبيق</h4>
-                    <p class="text-xs" style="color: var(--text-secondary)">ثبت التطبيق على جهازك</p>
                 </div>
             </div>
             <div class="menu-item" onclick="App.openPanel('notes-panel')">
@@ -1649,19 +1606,18 @@
         </div>
         <div class="flex-1 overflow-y-auto p-4">
             <!-- Image Preview -->
-            <div id="share-image-preview" class="mb-4 relative overflow-hidden">
-                <div id="share-text-wrapper" class="draggable-element">
-                    <button class="delete-btn">&times;</button>
-                    <p id="share-text" class="font-arabic text-2xl"></p>
+            <div id="share-image-preview" class="mb-4 relative touch-none" style="min-height: 400px; border: 1px solid var(--border);">
+                <div id="share-text-container" class="resize-drag absolute" style="padding: 10px; border: 1px dashed transparent; cursor: move;">
+                    <button class="delete-element absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 text-xs leading-none z-10">&times;</button>
+                    <p id="share-text" class="font-arabic text-2xl mb-4"></p>
                 </div>
-                <div id="share-info-wrapper" class="draggable-element">
-                    <button class="delete-btn">&times;</button>
-                    <p id="share-info" class="text-sm"></p>
+                <div id="share-info-container" class="resize-drag absolute" style="padding: 10px; border: 1px dashed transparent; bottom: 40px; left: 50%; transform: translateX(-50%); cursor: move;">
+                    <button class="delete-element absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 text-xs leading-none z-10">&times;</button>
+                    <p id="share-info" class="text-sm mb-4"></p>
                 </div>
-                <div id="watermark-wrapper" class="draggable-element">
-                    <button class="delete-btn">&times;</button>
-                    <p class="watermark">بصائر</p>
-                </div>
+                <div id="share-watermark-container" class="resize-drag absolute" style="padding: 10px; border: 1px dashed transparent; bottom: 20px; right: 20px; cursor: move;">
+                    <button class="delete-element absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 text-xs leading-none z-10">&times;</button>
+                    <p class="watermark">مصحف الهادي</p></div>
             </div>
             
             <!-- Customization Options -->
@@ -1713,10 +1669,14 @@
                     </select>
                 </div>
                 
-                <div class="flex items-center justify-between">
-                    <label class="text-sm">إضافة ظل للنص</label>
-                    <input type="checkbox" id="share-text-shadow" class="checkbox">
+                <div>
+                    <label class="block text-sm mb-2">ظل النص</label>
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" id="share-text-shadow" class="checkbox">
+                        <label for="share-text-shadow" class="text-sm">تفعيل الظل</label>
+                    </div>
                 </div>
+
                 <div class="flex gap-2">
                     <button id="generate-share-image" class="btn btn-primary flex-1">
                         <i class="fas fa-share"></i>
@@ -2126,8 +2086,8 @@
         pageData: null,
         selectedAyah: null,
         isPlaying: false,
-        autoplayOnLoad: false,
         currentAudioIndex: 0,
+        isAutoPlayingNextPage: false, // Flag for auto-navigation
         audioQueue: [],
         bookmarks: JSON.parse(localStorage.getItem('bookmarks')) || [],
         khatmahs: JSON.parse(localStorage.getItem('khatmahs')) || [],
@@ -2390,6 +2350,10 @@
             const pageContentEl = document.getElementById('page-content');
             const fontTypeEl = document.getElementById('font-type');
             const tafsirSelectEl = document.getElementById('tafsir-select');
+            const memorizationInterface = document.getElementById('memorization-interface');
+            const mainInterface = document.getElementById('main-reading-interface');
+            const body = document.body;
+
             const translationSelectEl = document.getElementById('translation-select');
             
             if (fontSizeEl) fontSizeEl.value = state.fontSize;
@@ -2398,6 +2362,15 @@
             
             if (fontTypeEl) fontTypeEl.value = state.fontType;
             if (pageContentEl) pageContentEl.className = state.fontType + ' text-xl leading-loose';
+
+            if (state.memorizationMode) {
+                mainInterface.classList.add('hidden');
+                memorizationInterface.classList.remove('hidden');
+                body.classList.add('memorization-mode');
+            } else {
+                memorizationInterface.classList.add('hidden');
+                mainInterface.classList.remove('hidden');
+            }
             
             // Load saved tafsir and translation selections
             if (tafsirSelectEl) tafsirSelectEl.value = state.selectedTafsir;
@@ -2435,19 +2408,36 @@
             }
         },
         
-        async loadPage(pageNumber) {
+        async loadPage(pageNumber, autoPlay = false) {
             if (pageNumber < 1 || pageNumber > CONFIG.TOTAL_PAGES) return;
             
             console.log('Loading page:', pageNumber);
             
             // Show skeleton loading
             const loadingScreen = document.getElementById('loading-screen');
+
+            // Stop any playing audio before loading new page
+            const audioEl = document.getElementById('page-audio');
+            if (!audioEl.paused) {
+                audioEl.pause();
+                state.isPlaying = false;
+                const playIcon = document.getElementById('play-icon');
+                const pauseIcon = document.getElementById('pause-icon');
+                playIcon.classList.remove('hidden');
+                pauseIcon.classList.add('hidden');
+            }
             const skeletonLoading = document.getElementById('skeleton-loading');
             const pageWrapper = document.getElementById('page-wrapper');
             
             if (loadingScreen) loadingScreen.style.display = 'none';
             if (skeletonLoading) skeletonLoading.classList.remove('hidden');
             if (pageWrapper) pageWrapper.classList.add('hidden');
+
+            // If we are not auto-playing to the next page, stop the audio
+            if (!autoPlay) {
+                state.isPlaying = false;
+                this.togglePlayPause(false);
+            }
             
             try {
                 console.log('Fetching page data for page:', pageNumber);
@@ -2464,19 +2454,13 @@
                 localStorage.setItem('lastPage', pageNumber);
                 
                 this.renderPage();
-                this.setupAudio();
+                this.setupAudio(); 
+
+                if (autoPlay) {
+                    this.togglePlayPause(true);
+                }
+
                 this.trackPageInKhatmah(pageNumber);
-
-                if (state.autoplayOnLoad) {
-                    const audioEl = document.getElementById('page-audio');
-                    audioEl.play();
-                    this.highlightPlayingAyah();
-                    state.autoplayOnLoad = false; // Reset the flag
-                }
-
-                if (state.memorizationMode) {
-                    this.startMemorizationMode('page');
-                }
                 
                 console.log('Page loaded successfully with', verses.length, 'verses');
             } catch (error) {
@@ -2652,16 +2636,17 @@
         
         // وضع التحفيظ - محسّن مع واجهة منفصلة - بدء مباشر
         startMemorizationMode(type = 'page') {
+            console.log("Starting memorization mode...");
             state.memorizationMode = true;
             state.memorizationRange.type = type;
             
             // إغلاق أي لوحة مفتوحة أولاً
             document.querySelectorAll('.panel.visible').forEach(panel => {
-                panel.classList.remove('visible');
+                this.closePanel(panel.id);
             });
             
             // التبديل إلى الواجهة المنفصلة مباشرة
-            this.switchToMemorizationInterface();
+            this.switchToMemorizationInterface(true);
             
             // إعادة تعيين إحصائيات الحفظ
             this.resetMemorizationStats();
@@ -2671,23 +2656,26 @@
             
             // بدء التعرف على الصوت عبر AssemblyAI
             startAssemblyAiStreaming();
+            this.updateMemorizationDisplay();
             
             this.showToast('بدأ وضع الحفظ - ابدأ بالتلاوة', 'success');
         },
         
         // التبديل إلى واجهة الحفظ المنفصلة
-        switchToMemorizationInterface() {
+        switchToMemorizationInterface(show) {
             const mainInterface = document.getElementById('main-reading-interface');
             const memorizationInterface = document.getElementById('memorization-interface');
-            
-            console.log('Switching to memorization interface...');
-            console.log('Main interface found:', !!mainInterface);
-            console.log('Memorization interface found:', !!memorizationInterface);
+            const body = document.body;
             
             if (mainInterface && memorizationInterface) {
-                mainInterface.classList.add('hidden');
-                memorizationInterface.classList.remove('hidden');
-                
+                if (show) {
+                    mainInterface.classList.add('hidden');
+                    memorizationInterface.classList.remove('hidden');
+                } else {
+                    mainInterface.classList.remove('hidden');
+                    memorizationInterface.classList.add('hidden');
+                }
+                body.classList.toggle('memorization-mode', show);
                 // تحديث معلومات الهيدر
                 this.updateMemorizationHeader();
                 
@@ -2707,13 +2695,8 @@
             
             console.log('Exiting memorization interface...');
             
-            if (memorizationInterface) {
-                memorizationInterface.classList.add('hidden');
-            }
-            
-            if (mainInterface) {
-                mainInterface.classList.remove('hidden');
-            }
+            this.switchToMemorizationInterface(false);
+            state.memorizationMode = false;
             
             // إيقاف وضع الحفظ
             this.stopMemorizationMode();
@@ -5016,12 +4999,7 @@
         // 🔍 Process Interim Sequence (for partial results)
         processInterimSequence(transcript, confidence) {
             const normalizedTranscript = this.normalizeArabicText(transcript);
-            const feedbackEl = document.getElementById('speech-interim-feedback');
             
-            if (feedbackEl) {
-                feedbackEl.textContent = `جاري الاستماع: ${transcript}`;
-            }
-
             // Show interim feedback with sequence preview
             if (state.memorizationStats.currentWordIndex < state.currentMemorizationWords.length) {
                 const remainingWords = state.currentMemorizationWords.slice(state.memorizationStats.currentWordIndex, state.memorizationStats.currentWordIndex + 3);
@@ -5815,23 +5793,6 @@
             this.showToast('تم إعادة بدء الحفظ', 'success');
         },
         
-        playMemorizationAudio() {
-            // تشغيل صوت الآية الحالية
-            if (state.pageData && state.pageData.length > 0) {
-                const firstVerse = state.pageData[0];
-                if (firstVerse && firstVerse.verse_key) {
-                    this.playAyahAudio(firstVerse.verse_key);
-                }
-            } else {
-                this.showToast('لا يمكن تشغيل الصوت حالياً', 'error');
-            }
-        },
-
-        convertToArabicNumbers(number) {
-            const arabicNumbers = ['٠', '٢', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
-            return number.toString().split('').map(digit => arabicNumbers[digit]).join('');
-        },
-        
         // Enhanced memorization helper functions
         showVerse() {
             const wordElements = document.querySelectorAll('.ayah-word');
@@ -5978,29 +5939,6 @@
             }
         },
 
-        playSuccessSound() {
-            try {
-                // صوت نجاح باستخدام Web Audio API
-                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                const oscillator = audioContext.createOscillator();
-                const gainNode = audioContext.createGain();
-                
-                oscillator.connect(gainNode);
-                gainNode.connect(audioContext.destination);
-                
-                oscillator.frequency.setValueAtTime(523.25, audioContext.currentTime); // C5
-                oscillator.frequency.setValueAtTime(659.25, audioContext.currentTime + 0.1); // E5
-                
-                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
-                
-                oscillator.start(audioContext.currentTime);
-                oscillator.stop(audioContext.currentTime + 0.3);
-            } catch (error) {
-                console.log('Audio context not available');
-            }
-        },
-        
         playErrorSound() {
             try {
                 // صوت خطأ
@@ -6024,6 +5962,23 @@
             }
         },
         
+        playSuccessSound() {
+            try {
+                // صوت نجاح باستخدام Web Audio API
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                oscillator.frequency.setValueAtTime(523.25, audioContext.currentTime); // C5
+                oscillator.frequency.setValueAtTime(659.25, audioContext.currentTime + 0.1); // E5
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.3);
+            } catch (error) { console.log('Audio context not available'); }
+        },
+        
         navigatePage(direction) {
             const newPage = state.currentPage + direction;
             if (newPage >= 1 && newPage <= CONFIG.TOTAL_PAGES) {
@@ -6031,11 +5986,11 @@
             }
         },
         
-        setupAudio() {
+        setupAudio(autoPlay = false) { // Accept autoPlay flag
             state.audioQueue = [];
             state.currentAudioIndex = 0;
             
-            if (state.pageData) {
+            if (state.pageData && Array.isArray(state.pageData)) {
                 state.pageData.forEach(verse => {
                     if (verse.audio?.url) {
                         state.audioQueue.push({
@@ -6049,24 +6004,13 @@
             const audioEl = document.getElementById('page-audio');
             if (state.audioQueue.length > 0) {
                 audioEl.src = state.audioQueue[0].url;
-            }
-        },
-        
-        playNextAyah() {
-            if (state.currentAudioIndex < state.audioQueue.length - 1) {
-                state.currentAudioIndex++;
-                const audioEl = document.getElementById('page-audio');
-                audioEl.src = state.audioQueue[state.currentAudioIndex].url;
-                audioEl.play();
-                this.highlightPlayingAyah();
-            } else {
-                // End of page, go to next page and autoplay
-                if (state.currentPage < CONFIG.TOTAL_PAGES) {
-                    state.autoplayOnLoad = true;
-                    this.loadPage(state.currentPage + 1);
+                if (autoPlay) { // If autoPlay is true, start playing immediately
+                    audioEl.play();
                 }
             }
         },
+        
+        
         
         // Show interim speech feedback (disabled per user request)
         showInterimFeedback(interimText) {
@@ -6160,8 +6104,18 @@
                 const audioEl = document.getElementById('page-audio');
                 audioEl.src = state.audioQueue[state.currentAudioIndex].url;
                 audioEl.play();
-                
                 this.highlightPlayingAyah();
+            } else {
+                // Last ayah of the page finished, navigate to the next page if possible
+                if (state.currentPage < CONFIG.TOTAL_PAGES) {
+                    console.log("Last ayah of page finished. Navigating to next page and autoplaying.");
+                    this.loadPage(state.currentPage + 1, true); // Pass true to autoPlay
+                } else {
+                    console.log("Last ayah of Quran finished. Stopping playback.");
+                    // This is the last ayah of the last page, so just stop.
+                    const audioEl = document.getElementById('page-audio');
+                    audioEl.pause();
+                }
             }
         },
         
@@ -6610,7 +6564,7 @@
             const [surahId, ayahNum] = state.selectedAyah.key.split(':');
             const surah = state.surahs.find(s => s.id == surahId);
             
-            const shareText = `${state.selectedAyah.text}\n\nسورة ${surah?.name_arabic || ''} - آية ${ayahNum}\n\nبصائر`;
+            const shareText = `${state.selectedAyah.text}\n\nسورة ${surah?.name_arabic || ''} - آية ${ayahNum}\n\nمصحف الهادي`;
             
             if (navigator.share) {
                 navigator.share({
@@ -6625,26 +6579,14 @@
         
         prepareShareImage() {
             if (!state.selectedAyah) return;
-        
+            
             const [surahId, ayahNum] = state.selectedAyah.key.split(':');
             const surah = state.surahs.find(s => s.id == surahId);
-        
-            // Reset elements
-            const textWrapper = document.getElementById('share-text-wrapper');
-            const infoWrapper = document.getElementById('share-info-wrapper');
-            const watermarkWrapper = document.getElementById('watermark-wrapper');
-        
-            // Make them visible and reset positions
-            [textWrapper, infoWrapper, watermarkWrapper].forEach(el => {
-                el.style.display = 'block';
-                el.style.position = 'relative';
-                el.style.top = 'auto';
-                el.style.left = 'auto';
-            });
-        
+            
             document.getElementById('share-text').textContent = state.selectedAyah.text;
             document.getElementById('share-info').textContent = `سورة ${surah?.name_arabic || ''} - آية ${ayahNum}`;
-        
+            this.initInteractJs();
+            
             this.updateSharePreview();
             this.openPanel('share-image-panel');
         },
@@ -6786,6 +6728,22 @@
             messagesEl.scrollTop = messagesEl.scrollHeight;
         },
         
+        dragMoveListener (event) {
+            var target = event.target
+            var x = (parseFloat(target.getAttribute('data-x')) || 0) + event.dx
+            var y = (parseFloat(target.getAttribute('data-y')) || 0) + event.dy
+
+            target.style.transform = 'translate(' + x + 'px, ' + y + 'px)'
+
+            target.setAttribute('data-x', x)
+            target.setAttribute('data-y', y)
+        },
+
+        playAyahAudio(verseKey) {
+            // This function is a placeholder. You would implement audio playback logic here.
+            console.log(`Playing audio for verse: ${verseKey}`);
+        },
+
         showToast(message, type = 'info') {
             const toast = document.createElement('div');
             const bgColor = type === 'error' ? 'from-red-500 to-red-600' : 
@@ -6823,8 +6781,9 @@
         openPanel(panelId) {
             const panel = document.getElementById(panelId);
             if (panel) {
-                panel.classList.add('visible');
-                document.body.classList.add('modal-open');
+                panel.classList.add('visible'); // Make the panel visible
+                document.body.classList.add('panel-open'); // Prevent body scroll
+                document.getElementById('main-content').style.overflow = 'hidden'; // Disable main content scroll
                 
                 document.querySelectorAll('.nav-item').forEach(item => {
                     item.classList.toggle('active', item.dataset.panel === panelId);
@@ -6841,8 +6800,9 @@
         closePanel(panelId) {
             const panel = document.getElementById(panelId);
             if (panel) {
-                panel.classList.remove('visible');
-                 document.body.classList.remove('modal-open');
+                panel.classList.remove('visible'); // Hide the panel
+                document.body.classList.remove('panel-open'); // Re-enable body scroll
+                document.getElementById('main-content').style.overflow = 'auto'; // Re-enable main content scroll
                 
                 document.querySelectorAll('.nav-item').forEach(item => {
                     item.classList.toggle('active', item.dataset.panel === 'home');
@@ -6942,6 +6902,28 @@
                 }
             });
             
+            // Add a new togglePlayPause function for better control
+            App.togglePlayPause = function(play) {
+                const audioEl = document.getElementById('page-audio');
+                const playIcon = document.getElementById('play-icon');
+                const pauseIcon = document.getElementById('pause-icon');
+
+                state.isPlaying = play;
+
+                if (play && state.audioQueue.length > 0) {
+                    if (audioEl.src !== state.audioQueue[state.currentAudioIndex].url) {
+                        audioEl.src = state.audioQueue[state.currentAudioIndex].url;
+                    }
+                    audioEl.play();
+                    playIcon.classList.add('hidden');
+                    pauseIcon.classList.remove('hidden');
+                    this.highlightPlayingAyah();
+                } else {
+                    audioEl.pause();
+                    playIcon.classList.remove('hidden');
+                    pauseIcon.classList.add('hidden');
+                }
+            };
             // Ayah click
             document.getElementById('page-content').addEventListener('click', e => {
                 const ayah = e.target.closest('.ayah');
@@ -6978,7 +6960,6 @@
                 const backdrop = document.getElementById('ayah-menu-backdrop');
                 
                 menu.style.transform = 'translateY(100%)';
-                document.body.classList.remove('modal-open');
                 setTimeout(() => {
                     menu.classList.add('hidden');
                     backdrop.classList.add('hidden');
@@ -6989,11 +6970,13 @@
             document.querySelectorAll('.nav-item').forEach(item => {
                 item.addEventListener('click', () => {
                     const panel = item.dataset.panel;
-                    if (panel === 'home') {
+                    if (!panel || panel === 'home') {
                         document.querySelectorAll('.panel').forEach(p => p.classList.remove('visible'));
+                        document.body.classList.remove('panel-open');
                         document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
                         item.classList.add('active');
-                    } else {
+                        document.getElementById('main-content').style.overflow = 'auto';
+                    } else if (panel) {
                         this.openPanel(panel);
                     }
                 });
@@ -7039,12 +7022,7 @@
             const pauseIcon = document.getElementById('pause-icon');
             
             playBtn.addEventListener('click', () => {
-                if (audioEl.paused && state.audioQueue.length > 0) {
-                    audioEl.play();
-                    this.highlightPlayingAyah();
-                } else {
-                    audioEl.pause();
-                }
+                this.togglePlayPause(!state.isPlaying);
             });
             
             // Next/Previous audio buttons
@@ -7072,7 +7050,7 @@
             
             audioEl.addEventListener('timeupdate', () => {
                 const progress = (audioEl.currentTime / audioEl.duration) * 100;
-                document.getElementById('audio-progress').style.width = `${progress}%`;
+                document.getElementById('audio-progress').style.width = `${isNaN(progress) ? 0 : progress}%`;
             });
             
             // Progress bar click
@@ -7218,7 +7196,6 @@
                         `;
                         
                         document.getElementById('tafsir-popup').style.display = 'flex';
-                        document.body.classList.add('modal-open');
                     } catch (error) {
                         console.error('Error loading tafsir:', error);
                         this.showToast('حدث خطأ في تحميل التفسير', 'error');
@@ -7230,7 +7207,6 @@
             
             document.getElementById('close-tafsir').addEventListener('click', () => {
                 document.getElementById('tafsir-popup').style.display = 'none';
-                document.body.classList.remove('modal-open');
             });
             
             document.getElementById('ayah-bookmark').addEventListener('click', () => {
@@ -7309,73 +7285,6 @@
                 state.shareSettings.fontFamily = e.target.value;
                 this.updateSharePreview();
             });
-
-            document.getElementById('share-text-shadow').addEventListener('change', () => {
-                this.updateSharePreview();
-            });
-            
-            // Make elements draggable
-            let isDragging = false;
-            let currentDraggable = null;
-            let offsetX, offsetY;
-            
-            const previewContainer = document.getElementById('share-image-preview');
-            
-            const makeDraggable = (el) => {
-                el.addEventListener('mousedown', (e) => {
-                    if (e.target.classList.contains('delete-btn')) return;
-                    isDragging = true;
-                    currentDraggable = el;
-                    // Use getBoundingClientRect for accuracy with scaled/transformed elements
-                    const rect = el.getBoundingClientRect();
-                    const containerRect = previewContainer.getBoundingClientRect();
-                    offsetX = e.clientX - (rect.left - containerRect.left);
-                    offsetY = e.clientY - (rect.top - containerRect.top);
-                    el.style.cursor = 'grabbing';
-                    el.style.zIndex = 1000;
-                });
-            };
-            
-            makeDraggable(document.getElementById('share-text-wrapper'));
-            makeDraggable(document.getElementById('share-info-wrapper'));
-            makeDraggable(document.getElementById('watermark-wrapper'));
-            
-            document.querySelectorAll('.delete-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    e.target.closest('.draggable-element').style.display = 'none';
-                });
-            });
-
-            previewContainer.addEventListener('mousemove', (e) => {
-                if (isDragging && currentDraggable) {
-                    e.preventDefault();
-                    let newX = e.clientX - offsetX;
-                    let newY = e.clientY - offsetY;
-            
-                    const elRect = currentDraggable.getBoundingClientRect();
-                    const containerRect = previewContainer.getBoundingClientRect();
-
-                    // Constrain movement within the preview container
-                    newX = Math.max(0, Math.min(newX, containerRect.width - elRect.width));
-                    newY = Math.max(0, Math.min(newY, containerRect.height - elRect.height));
-            
-                    currentDraggable.style.left = `${newX}px`;
-                    currentDraggable.style.top = `${newY}px`;
-                }
-            });
-            
-            document.addEventListener('mouseup', () => {
-                if (isDragging) {
-                    isDragging = false;
-                    if (currentDraggable) {
-                        currentDraggable.style.cursor = 'grab';
-                        currentDraggable.style.zIndex = 'auto';
-                        currentDraggable = null;
-                    }
-                }
-            });
-
             
             // Share and Download buttons
             document.getElementById('generate-share-image').addEventListener('click', () => {
@@ -7537,16 +7446,11 @@
             // عند استقبال نص من الخدمة
             assemblyAiSocket.onmessage = (message) => {
                 const result = JSON.parse(message.data);
-                if (!result.text) {
-                    return;
-                }
-
-                if (result.message_type === 'PartialTranscript' && result.text) {
-                    console.log("Partial: ", result.text);
-                    App.processInterimSequence(result.text, result.confidence || 0.7);
-                } else if (result.message_type === 'FinalTranscript' && result.text) {
-                    console.log("Final: ", result.text);
-                    App.processSequentialText(result.text, result.confidence || 1.0, performance.now());
+                // نحن نهتم فقط بالنتائج النهائية لضمان الدقة
+                if (result.text && result.message_type === 'FinalTranscript') {
+                    console.log("API Response:", result.text);
+                    // استدعاء دالة معالجة النص الموجودة في تطبيقك
+                    App.processSequentialText(result.text, 1.0, performance.now());
                 }
             };
     
@@ -7588,26 +7492,6 @@
     // Make App globally accessible
     window.App = App;
     
-    let deferredPrompt;
-    const installAppItem = document.getElementById('install-app-item');
-
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      deferredPrompt = e;
-      installAppItem.style.display = 'flex';
-    });
-
-    installAppItem.addEventListener('click', async () => {
-      if (deferredPrompt) {
-        deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        if (outcome === 'accepted') {
-          installAppItem.style.display = 'none';
-        }
-        deferredPrompt = null;
-      }
-    });
-
     // Initialize app when DOM is ready
     document.addEventListener('DOMContentLoaded', () => {
         App.init();
@@ -7623,6 +7507,11 @@
             });
         });
     }
-    </script>
+    ument.addEventListener('DOMContentLoaded', () => {
+        App.init();
+    });
+    
+    
+</script>
 </body>
 </html>
