@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../hooks/useApp';
 import { API_BASE, AUDIO_BASE } from '../constants';
-import { Panel } from '../../types';
+import { Panel } from '../types';
 
 const AyahContextMenu: React.FC = () => {
     const { state, actions } = useApp();
