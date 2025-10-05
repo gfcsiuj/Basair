@@ -1,11 +1,10 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Panel from './Panel';
-import { Panel as PanelType, SearchResponse, SearchResultItem } from '../../types';
+import { Panel as PanelType, SearchResultItem, SearchResponse } from '../../types';
 import { useApp } from '../../hooks/useApp';
 import { API_BASE, AUDIO_BASE } from '../../constants';
 
-// FIX: Encapsulated all logic within the component and added the main return statement.
-// This resolves all scope-related "Cannot find name" errors and the missing return type error.
 const SearchPanel: React.FC = () => {
     const { state, actions } = useApp();
     const [query, setQuery] = useState('');
@@ -25,11 +24,18 @@ const SearchPanel: React.FC = () => {
         setIsLoading(true);
         setError(null);
         try {
-            const url = `${API_BASE}/search?q=${encodeURIComponent(searchQuery)}&language=ar`;
+            // Revert to the stable quran.com API endpoint as the other one is unreliable
+            const url = `${API_BASE}/search?q=${encodeURIComponent(searchQuery)}&language=ar&size=50`;
             const data = await actions.fetchWithRetry<SearchResponse>(url);
-            setResults(data.search.results);
-            if (data.search.results.length === 0) {
-                setError('لم يتم العثور على نتائج.');
+
+            if (data.search && data.search.results) {
+                const searchResults = data.search.results;
+                setResults(searchResults);
+                if (searchResults.length === 0) {
+                    setError('لم يتم العثور على نتائج.');
+                }
+            } else {
+                throw new Error('Invalid API response structure');
             }
         } catch (err) {
             console.error('Search failed:', err);
@@ -79,31 +85,61 @@ const SearchPanel: React.FC = () => {
 
     const handlePlayAudio = async (e: React.MouseEvent, verseKey: string) => {
         e.stopPropagation();
-
+    
         if (playingVerseKey === verseKey && audioRef.current) {
             audioRef.current.pause();
             setPlayingVerseKey(null);
             return;
         }
-
+    
         if (audioRef.current) {
             audioRef.current.pause();
         }
-
+    
         setPlayingVerseKey(verseKey);
-
+    
+        let audioUrl = '';
+        const reciterId = state.selectedReciterId;
+    
         try {
-            const verseData = await actions.fetchWithRetry<{ verse: { audio: { url: string } } }>(`${API_BASE}/verses/by_key/${verseKey}?audio=${state.selectedReciterId}`);
-            if (verseData.verse.audio?.url) {
-                const audio = new Audio(`${AUDIO_BASE}${verseData.verse.audio.url}`);
+            if (reciterId >= 1001) {
+                const [surahIdStr, ayahIdStr] = verseKey.split(':');
+                const surahId = parseInt(surahIdStr);
+                const ayahId = parseInt(ayahIdStr);
+                let reciterCode = 0;
+                switch (reciterId) {
+                    case 1001: reciterCode = 2; break; // Abu Bakr Al Shatri
+                    case 1002: reciterCode = 3; break; // Nasser Al Qatami
+                    case 1003: reciterCode = 4; break; // Yasser Al Dosari
+                    case 1004: reciterCode = 5; break; // Hani Ar Rifai
+                }
+                if (reciterCode > 0) {
+                    audioUrl = `https://the-quran-project.github.io/Quran-Audio/Data/${reciterCode}/${surahId}_${ayahId}.mp3`;
+                }
+            } else {
+                const verseData = await actions.fetchWithRetry<{ verse: { audio: { url: string } } }>(`${API_BASE}/verses/by_key/${verseKey}?audio=${reciterId}`);
+                if (verseData.verse.audio?.url) {
+                    audioUrl = `${AUDIO_BASE}${verseData.verse.audio.url}`;
+                }
+            }
+    
+            if (audioUrl) {
+                const audio = new Audio(audioUrl);
                 audioRef.current = audio;
-                audio.play();
+                const playPromise = audio.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(err => {
+                        console.error("Audio playback error:", err);
+                        setPlayingVerseKey(null);
+                    });
+                }
                 audio.onended = () => setPlayingVerseKey(null);
                 audio.onerror = () => {
-                    console.error("Audio playback error");
+                    console.error("Audio playback error on element.");
                     setPlayingVerseKey(null);
                 };
             } else {
+                console.warn(`No audio URL found for verse ${verseKey} with reciter ${reciterId}`);
                 setPlayingVerseKey(null);
             }
         } catch (err) {
@@ -154,8 +190,9 @@ const SearchPanel: React.FC = () => {
                             >
                                 <p
                                     className="font-arabic text-lg mb-3 text-text-primary text-right"
-                                    dangerouslySetInnerHTML={{ __html: result.text.replace(/<mark>/g, '<mark class="bg-secondary/30 rounded px-1">') }}
-                                ></p>
+                                    dangerouslySetInnerHTML={{ __html: result.text }}
+                                >
+                                </p>
                                 <div className="flex items-center justify-between">
                                     <p className="text-sm text-text-secondary font-medium">{surahName} : {ayahNum}</p>
                                     <button onClick={(e) => handlePlayAudio(e, result.verse_key)} className="w-8 h-8 flex items-center justify-center text-primary rounded-full hover:bg-primary/10 transition-colors">

@@ -101,11 +101,12 @@ const MemorizationInterface: React.FC = () => {
     const touchStartX = useRef(0);
     const touchStartY = useRef(0);
 
-    const allWords = useMemo(() => 
-        state.pageData?.flatMap(verse => 
+    const allWords = useMemo(() => {
+        const verses = [...(state.pageData.right || []), ...(state.pageData.left || [])];
+        return verses.flatMap(verse => 
             verse.words.filter(w => w.char_type_name === 'word')
-        ) || [], 
-    [state.pageData]);
+        );
+    }, [state.pageData]);
     
     // Using refs to hold state for stable callbacks
     const allWordsRef = useRef(allWords);
@@ -171,7 +172,10 @@ const MemorizationInterface: React.FC = () => {
                      if (i < newStates.length) newStates[i] = AyahWordState.Skipped;
                  }
             }
-            if (startIndex < newStates.length) newStates[startIndex] = AyahWordState.Correct;
+            if (startIndex < newStates.length) {
+                newStates[startIndex] = AyahWordState.Correct;
+                actions.addMemorizationPoints(10); // Award points for correct word
+            }
 
             setWordStates(newStates);
             
@@ -182,6 +186,7 @@ const MemorizationInterface: React.FC = () => {
         } else {
             if (localCurrentIndex < newStates.length) {
                 newStates[localCurrentIndex] = AyahWordState.Incorrect;
+                actions.addMemorizationPoints(-5); // Deduct points for incorrect word
                 setWordStates(newStates);
                 setTimeout(() => {
                     setWordStates(prev => {
@@ -194,7 +199,7 @@ const MemorizationInterface: React.FC = () => {
                 }, 800);
             }
         }
-    }, []);
+    }, [actions]);
 
     const stopListening = useCallback(() => {
         if (!isListeningRef.current) return;
@@ -255,7 +260,6 @@ const MemorizationInterface: React.FC = () => {
                 if(processTimeoutRef.current) clearTimeout(processTimeoutRef.current);
                 processTimeoutRef.current = setTimeout(processBufferedTranscript, 200);
               }
-              // Acknowledge model's audio output per API guidelines.
               if (message.serverContent?.modelTurn?.parts[0]?.inlineData.data) {}
             },
             onerror: (e: ErrorEvent) => {
@@ -264,7 +268,6 @@ const MemorizationInterface: React.FC = () => {
             },
             onclose: (e: CloseEvent) => {
                 console.log('Gemini Live session closed.');
-                 // Only set isListening to false if it was not intentionally stopped.
                 if (isListeningRef.current) {
                     setIsListening(false);
                 }
@@ -296,7 +299,6 @@ const MemorizationInterface: React.FC = () => {
       }
     }, [state.ai, processBufferedTranscript, stopListening]);
     
-    // Effect to reset state and manage listening session when page data changes.
     useEffect(() => {
         stopListening();
 
@@ -316,10 +318,10 @@ const MemorizationInterface: React.FC = () => {
         };
     }, [allWords, startListening, stopListening]);
     
-    // Effect for automatic page turning upon completion.
     useEffect(() => {
         if (currentWordIndex > 0 && currentWordIndex === allWords.length && allWords.length > 0) {
             if (state.currentPage < TOTAL_PAGES) {
+                actions.addMemorizationPoints(100); // Award bonus for page completion
                 const pageTurnTimeout = setTimeout(() => {
                     actions.loadPage(state.currentPage + 1);
                 }, 1500);
@@ -328,7 +330,6 @@ const MemorizationInterface: React.FC = () => {
         }
     }, [currentWordIndex, allWords.length, state.currentPage, actions]);
 
-    // Keyboard and Swipe navigation
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'ArrowLeft' && state.currentPage < TOTAL_PAGES) {
@@ -367,7 +368,6 @@ const MemorizationInterface: React.FC = () => {
         if(currentWordIndex < allWords.length) {
             setWordStates(prev => {
                 const newStates = [...prev];
-                // Toggle between Hinted and Hidden
                 if (newStates[currentWordIndex] === AyahWordState.Hinted) {
                     newStates[currentWordIndex] = AyahWordState.Hidden;
                 } else {
@@ -390,10 +390,12 @@ const MemorizationInterface: React.FC = () => {
     };
 
     const handleRevealAyah = () => {
-        if (!state.pageData) return;
+        const verses = [...(state.pageData.right || []), ...(state.pageData.left || [])];
+        if (verses.length === 0) return;
+        
         let wordCounter = 0;
         
-        for (const verse of state.pageData) {
+        for (const verse of verses) {
             const verseWordCount = verse.words.filter(w => w.char_type_name === 'word').length;
             if (currentWordIndex >= wordCounter && currentWordIndex < wordCounter + verseWordCount) {
                 const firstWordOfVerseIndex = wordCounter;
@@ -416,7 +418,7 @@ const MemorizationInterface: React.FC = () => {
     };
     
     let globalWordCounter = 0;
-    const surah = state.pageData?.[0] ? state.surahs.find(s => s.id === state.pageData[0].chapter_id) : null;
+    const surah = state.pageData?.right?.[0] || state.pageData?.left?.[0] ? state.surahs.find(s => s.id === (state.pageData.right?.[0] || state.pageData.left?.[0])!.chapter_id) : null;
     
     const correctWords = wordStates.filter(s => s === AyahWordState.Correct || s === AyahWordState.Skipped || s === AyahWordState.Revealed).length;
     const progress = allWords.length > 0 ? (correctWords / allWords.length) * 100 : 0;
@@ -428,34 +430,26 @@ const MemorizationInterface: React.FC = () => {
                     className="flex items-center justify-between px-4 pb-3"
                     style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top, 0rem))' }}
                 >
-                    <div className="flex items-center gap-2">
+                     <div className="flex items-center gap-2">
                         <button onClick={() => actions.setReadingMode(ReadingMode.Reading)} className="p-2 rounded-lg text-text-secondary hover:bg-bg-tertiary transition-colors">
                             <i className="fas fa-arrow-right text-lg"></i>
                         </button>
-                        <button 
-                            onClick={() => actions.loadPage(state.currentPage - 1)} 
-                            disabled={state.currentPage <= 1}
-                            aria-label="الصفحة السابقة"
-                            className="p-2 rounded-lg text-text-secondary hover:bg-bg-tertiary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            <i className="fas fa-chevron-right text-lg"></i>
-                        </button>
+                        <div className="flex items-center gap-1 text-amber-500">
+                             <i className="fas fa-star"></i>
+                             <span className="font-bold text-sm">{state.memorizationStats.points}</span>
+                        </div>
                     </div>
                     <div>
                         <h1 className="text-sm font-bold text-center text-text-primary">وضع التحفيظ</h1>
                         <p className="text-xs text-center text-text-secondary">{surah?.name_arabic} - صفحة {state.currentPage}</p>
                     </div>
-                     <div className="flex items-center gap-2">
-                         <button 
-                            onClick={() => actions.loadPage(state.currentPage + 1)} 
-                            disabled={state.currentPage >= TOTAL_PAGES}
-                            aria-label="الصفحة التالية"
-                            className="p-2 rounded-lg text-text-secondary hover:bg-bg-tertiary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            <i className="fas fa-chevron-left text-lg"></i>
-                        </button>
+                     <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1 text-red-500">
+                             <i className="fas fa-fire"></i>
+                             <span className="font-bold text-sm">{state.memorizationStats.streak}</span>
+                        </div>
                         <div className="w-8 h-8 flex items-center justify-center text-lg">
-                            {isListening ? <i className="fas fa-microphone text-primary"></i> : <i className="fas fa-microphone-slash text-red-500"></i>}
+                            {isListening ? <i className="fas fa-microphone text-primary animate-pulse"></i> : <i className="fas fa-microphone-slash text-red-500"></i>}
                         </div>
                      </div>
                 </div>
@@ -473,7 +467,7 @@ const MemorizationInterface: React.FC = () => {
                 onTouchEnd={handleTouchEnd}
             >
                  <div className={`font-arabic text-right`} style={{ fontSize: `${state.fontSize + 2}px`, lineHeight: 3 }}>
-                    {state.pageData?.map(verse => (
+                    {[...(state.pageData.right || []), ...(state.pageData.left || [])].map(verse => (
                        <React.Fragment key={verse.verse_key}>
                            {verse.words.filter(w => w.char_type_name === 'word').map((word) => {
                                const myIndex = globalWordCounter;

@@ -12,6 +12,9 @@ const MainReadingInterface: React.FC = () => {
     const mainContentRef = useRef<HTMLDivElement>(null);
     const touchStartX = useRef(0);
     const touchStartY = useRef(0);
+    const initialPinchDistance = useRef(0);
+    const lastFontSize = useRef(state.fontSize);
+    const gestureState = useRef<'none' | 'swipe' | 'pinch'>('none');
     
     const [isDesktopView, setIsDesktopView] = useState(window.innerWidth > 1024);
 
@@ -26,31 +29,72 @@ const MainReadingInterface: React.FC = () => {
         
         return () => mediaQuery.removeEventListener('change', handleResize);
     }, [actions, state.currentPage]);
-
-    const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
-        touchStartX.current = e.touches[0].clientX;
-        touchStartY.current = e.touches[0].clientY;
+    
+    const getDistance = (touches: React.TouchList) => {
+        const [touch1, touch2] = [touches[0], touches[1]];
+        return Math.sqrt(
+            Math.pow(touch2.clientX - touch1.clientX, 2) +
+            Math.pow(touch2.clientY - touch1.clientY, 2)
+        );
     };
 
-    const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
-        const touchEndX = e.changedTouches[0].clientX;
-        const touchEndY = e.changedTouches[0].clientY;
-        const diffX = touchEndX - touchStartX.current;
-        const diffY = Math.abs(touchEndY - touchStartY.current);
+    const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+        actions.recordUserActivity();
+        if (e.touches.length === 1) {
+            gestureState.current = 'swipe';
+            touchStartX.current = e.touches[0].clientX;
+            touchStartY.current = e.touches[0].clientY;
+        } else if (e.touches.length === 2) {
+            gestureState.current = 'pinch';
+            e.preventDefault();
+            initialPinchDistance.current = getDistance(e.touches);
+            lastFontSize.current = state.fontSize;
+        } else {
+            gestureState.current = 'none';
+        }
+    };
 
-        // Don't swipe if a modal/panel is open
-        if (state.selectedAyah || state.selectedWord) return;
-
-        if (Math.abs(diffX) > 50 && diffY < 100) { // Horizontal swipe
-            actions.recordUserActivity(); // Ensure UI is visible on swipe
-            const pageIncrement = isDesktopView ? 2 : 1;
-            if (diffX > 0 && state.currentPage > 1) { // Swipe right (previous page)
-                const newPage = Math.max(1, state.currentPage - pageIncrement);
-                actions.loadPage(newPage);
-            } else if (diffX < 0 && state.currentPage < TOTAL_PAGES) { // Swipe left (next page)
-                const newPage = Math.min(TOTAL_PAGES, state.currentPage + pageIncrement);
-                actions.loadPage(newPage);
+    const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+        if (gestureState.current === 'pinch' && e.touches.length === 2) {
+            e.preventDefault();
+            const newDistance = getDistance(e.touches);
+            const scale = newDistance / (initialPinchDistance.current || 1); // Avoid division by zero
+            
+            let newSize = Math.round(lastFontSize.current * scale);
+            newSize = Math.max(16, Math.min(36, newSize)); // Clamp font size
+            
+            if (newSize !== state.fontSize) {
+                actions.setFontSize(newSize);
             }
+        }
+    };
+
+
+    const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
+        if (gestureState.current === 'swipe' && e.changedTouches.length === 1) {
+            const touchEndX = e.changedTouches[0].clientX;
+            const touchEndY = e.changedTouches[0].clientY;
+            const diffX = touchEndX - touchStartX.current;
+            const diffY = Math.abs(touchEndY - touchStartY.current);
+
+            // Don't swipe if a modal/panel is open
+            if (state.selectedAyah || state.selectedWord) return;
+
+            if (Math.abs(diffX) > 50 && diffY < 100) { // Horizontal swipe
+                const pageIncrement = isDesktopView ? 2 : 1;
+                if (diffX > 0 && state.currentPage > 1) { // Swipe right (previous page)
+                    const newPage = Math.max(1, state.currentPage - pageIncrement);
+                    actions.loadPage(newPage);
+                } else if (diffX < 0 && state.currentPage < TOTAL_PAGES) { // Swipe left (next page)
+                    const newPage = Math.min(TOTAL_PAGES, state.currentPage + pageIncrement);
+                    actions.loadPage(newPage);
+                }
+            }
+        }
+
+        if (e.touches.length === 0) {
+            gestureState.current = 'none';
+            initialPinchDistance.current = 0;
         }
     };
     
@@ -115,9 +159,16 @@ const MainReadingInterface: React.FC = () => {
                     transition: 'padding-top 0.3s ease-in-out, padding-bottom 0.3s ease-in-out',
                 }}
                 onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
                 onScroll={actions.recordUserActivity}
-                onClick={actions.toggleUIVisibility}
+                onClick={(e) => {
+                    // Prevent UI toggle if the click target is interactive
+                    if ((e.target as HTMLElement).closest('button, a, input, select, .word, .verse-number')) {
+                        return;
+                    }
+                    actions.toggleUIVisibility();
+                }}
             >
                 {renderContent()}
             </main>

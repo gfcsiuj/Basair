@@ -1,11 +1,21 @@
-
-import React from 'react';
+import React, { useMemo } from 'react';
 import Panel from './Panel';
 import { Panel as PanelType, Theme, Font } from '../../types';
 import { useApp } from '../../hooks/useApp';
 
 const SettingsPanel: React.FC = () => {
     const { state, actions } = useApp();
+
+    const sortedReciters = useMemo(() => {
+        const favorites = new Set(state.favoriteReciters);
+        return [...state.reciters].sort((a, b) => {
+            const aIsFav = favorites.has(a.id);
+            const bIsFav = favorites.has(b.id);
+            if (aIsFav && !bIsFav) return -1;
+            if (!aIsFav && bIsFav) return 1;
+            return a.reciter_name.localeCompare(b.reciter_name, 'ar');
+        });
+    }, [state.reciters, state.favoriteReciters]);
 
     const themes: { id: Theme; name: string; icon: string; color: string }[] = [
         { id: 'light', name: 'فاتح', icon: 'fa-sun', color: 'text-yellow-500' },
@@ -58,15 +68,23 @@ const SettingsPanel: React.FC = () => {
             )
         },
         {
-            title: "تفضيلات المحتوى",
+            title: "تفضيلات المحتوى والصوت",
             icon: "fa-user-cog",
             content: (
                  <div className="space-y-4">
                     <div>
                         <label className="block text-sm mb-2 text-text-secondary">القارئ</label>
                         <select value={state.selectedReciterId} onChange={(e) => actions.setReciter(parseInt(e.target.value))} className="input w-full bg-bg-primary border-border focus:border-primary">
-                            {state.reciters.map(reciter => <option key={reciter.id} value={reciter.id}>{reciter.reciter_name}</option>)}
+                            {sortedReciters.map(reciter => <option key={reciter.id} value={reciter.id}>{state.favoriteReciters.includes(reciter.id) ? '⭐ ' : ''}{reciter.reciter_name}</option>)}
                         </select>
+                    </div>
+                     <div>
+                        <label className="block text-sm mb-2 text-text-secondary">سرعة التلاوة ({state.playbackRate}x)</label>
+                         <div className="flex items-center gap-4">
+                            <i className="fas fa-tortoise"></i>
+                            <input type="range" min="0.5" max="2" step="0.25" value={state.playbackRate} onChange={(e) => actions.setPlaybackRate(parseFloat(e.target.value))} className="w-full h-2 bg-bg-tertiary rounded-lg appearance-none cursor-pointer accent-primary" />
+                            <i className="fas fa-hare"></i>
+                        </div>
                     </div>
                     <div>
                         <label className="block text-sm mb-2 text-text-secondary">التفسير</label>

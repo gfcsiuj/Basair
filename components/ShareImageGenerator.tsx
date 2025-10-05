@@ -9,10 +9,12 @@ const ShareImageGenerator: React.FC = () => {
 
     const [config, setConfig] = useState({
         fontSize: 40,
-        fontFamily: 'arabic', // Maps to font-arabic from tailwind
+        fontFamily: 'arabic',
         textColor: '#FFFFFF',
         bgColor: '#059669',
+        bgImage: '',
         showInfo: true,
+        padding: 32,
     });
     const previewRef = useRef<HTMLDivElement>(null);
     const [isSharing, setIsSharing] = useState(false);
@@ -81,7 +83,16 @@ const ShareImageGenerator: React.FC = () => {
         { id: 'noto', name: 'نسخ' },
     ];
     const textColors = ['#FFFFFF', '#000000', '#FBBF24', '#34D399', '#3B82F6'];
-    const bgColors = ['#059669', '#111827', '#FDE68A', '#FEF3C7', '#1F2937'];
+    const backgrounds = [
+        { type: 'color', value: '#059669' },
+        { type: 'color', value: '#111827' },
+        { type: 'color', value: '#78350f' },
+        { type: 'image', value: 'https://images.unsplash.com/photo-1584267385494-9fdd9a71ad75?ixlib=rb-4.0.3&q=85&fm=jpg&crop=entropy&cs=srgb&w=600' },
+        { type: 'image', value: 'https://images.unsplash.com/photo-1609597413125-97e35b715104?ixlib=rb-4.0.3&q=85&fm=jpg&crop=entropy&cs=srgb&w=600' },
+        { type: 'gradient', value: 'linear-gradient(to top right, #059669, #34d399)' },
+        { type: 'gradient', value: 'linear-gradient(to top right, #5b21b6, #a78bfa)' },
+    ];
+
 
     if (!isRendered) return null;
 
@@ -102,46 +113,56 @@ const ShareImageGenerator: React.FC = () => {
                 <main className="flex-1 p-4 flex items-center justify-center bg-bg-secondary overflow-hidden">
                     <div
                         ref={previewRef}
-                        className={`w-[400px] h-[400px] flex flex-col items-center justify-center p-8 text-center ${fontClasses[config.fontFamily]}`}
-                        style={{ backgroundColor: config.bgColor, color: config.textColor, fontSize: `${config.fontSize}px`, lineHeight: 1.8 }}
+                        className={`w-[400px] h-[400px] flex flex-col items-center justify-center text-center relative overflow-hidden shadow-lg ${fontClasses[config.fontFamily]}`}
+                        style={{ 
+                            backgroundColor: config.bgImage ? 'transparent' : config.bgColor, 
+                            backgroundImage: config.bgImage ? `url(${config.bgImage})` : (backgrounds.find(b => b.value === config.bgColor && b.type === 'gradient')?.value),
+                            backgroundSize: 'cover',
+                            backgroundPosition: 'center',
+                            color: config.textColor, 
+                            fontSize: `${config.fontSize}px`, 
+                            lineHeight: 1.8,
+                            padding: `${config.padding}px`
+                        }}
                     >
-                        <p>{selectedAyah?.text_uthmani}</p>
-                        {config.showInfo && (
-                             <p className="font-ui mt-4 opacity-80" style={{ fontSize: `${config.fontSize * 0.4}px` }}>
-                                {`{${surah?.name_arabic}: ${selectedAyah?.verse_number}}`}
-                            </p>
-                        )}
+                         {config.bgImage && <div className="absolute inset-0 bg-black/30"></div>}
+                        <div className="relative z-10">
+                            <p>{selectedAyah?.text_uthmani}</p>
+                            {config.showInfo && (
+                                 <p className="font-ui mt-4 opacity-80" style={{ fontSize: `${config.fontSize * 0.4}px` }}>
+                                    {`{${surah?.name_arabic}: ${selectedAyah?.verse_number}}`}
+                                </p>
+                            )}
+                        </div>
                     </div>
                 </main>
 
-                <footer className="p-4 space-y-4 shrink-0 border-t border-border overflow-y-auto">
-                    {/* Font Size */}
+                <footer className="p-4 space-y-4 shrink-0 border-t border-border overflow-y-auto custom-scrollbar max-h-60">
                     <div className="flex items-center gap-4">
-                        <label className="text-sm font-medium w-16">حجم الخط</label>
-                        <input type="range" min="24" max="72" value={config.fontSize} onChange={(e) => setConfig(c => ({...c, fontSize: parseInt(e.target.value)}))} className="w-full h-2 bg-bg-tertiary rounded-lg appearance-none cursor-pointer accent-primary" />
-                    </div>
-                    {/* Font Family */}
-                     <div className="flex items-center gap-4">
-                        <label className="text-sm font-medium w-16">نوع الخط</label>
-                        <div className="flex-1 grid grid-cols-3 gap-2">
-                           {fonts.map(font => (
-                               <button key={font.id} onClick={() => setConfig(c => ({ ...c, fontFamily: font.id }))} className={`p-2 rounded-md border-2 text-sm ${config.fontFamily === font.id ? 'border-primary bg-primary/10' : 'border-border bg-bg-primary'}`}>{font.name}</button>
-                           ))}
+                        <label className="text-sm font-medium w-20">الخلفية</label>
+                        <div className="flex items-center gap-2">
+                            {backgrounds.map(bg => (
+                                <button key={bg.value} onClick={() => setConfig(c => ({...c, bgColor: bg.type !== 'image' ? bg.value : c.bgColor, bgImage: bg.type === 'image' ? bg.value : ''}))} 
+                                className={`w-8 h-8 rounded-full border-2 overflow-hidden flex-shrink-0
+                                    ${(config.bgImage === bg.value || (config.bgColor === bg.value && !config.bgImage)) ? 'border-primary' : 'border-transparent'}`} 
+                                style={{
+                                    background: bg.type === 'image' ? `url(${bg.value})` : bg.value,
+                                    backgroundSize: 'cover'
+                                }}></button>
+                            ))}
                         </div>
                     </div>
-                     {/* Text Color */}
+                    
                     <div className="flex items-center gap-4">
-                        <label className="text-sm font-medium w-16">لون النص</label>
+                        <label className="text-sm font-medium w-20">لون النص</label>
                         <div className="flex items-center gap-2">
                             {textColors.map(color => <button key={color} onClick={() => setConfig(c => ({...c, textColor: color}))} className={`w-8 h-8 rounded-full border-2 ${config.textColor === color ? 'border-primary' : 'border-transparent'}`} style={{backgroundColor: color}}></button>)}
                         </div>
                     </div>
-                     {/* Background Color */}
-                     <div className="flex items-center gap-4">
-                        <label className="text-sm font-medium w-16">الخلفية</label>
-                        <div className="flex items-center gap-2">
-                            {bgColors.map(color => <button key={color} onClick={() => setConfig(c => ({...c, bgColor: color}))} className={`w-8 h-8 rounded-full border-2 ${config.bgColor === color ? 'border-primary' : 'border-transparent'}`} style={{backgroundColor: color}}></button>)}
-                        </div>
+
+                    <div className="flex items-center gap-4">
+                        <label className="text-sm font-medium w-20">حجم الخط</label>
+                        <input type="range" min="24" max="72" value={config.fontSize} onChange={(e) => setConfig(c => ({...c, fontSize: parseInt(e.target.value)}))} className="w-full h-2 bg-bg-tertiary rounded-lg appearance-none cursor-pointer accent-primary" />
                     </div>
 
                     <button onClick={handleShare} disabled={isSharing} className="w-full bg-primary text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 hover:bg-primary-dark transition-colors disabled:bg-primary/50">

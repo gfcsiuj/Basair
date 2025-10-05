@@ -8,14 +8,23 @@ import { TOTAL_PAGES } from '../../constants';
 export const MenuPanel: React.FC = () => {
     const { actions } = useApp();
     
-    const menuItems = [
+    const menuItems: {
+        icon: string;
+        title: string;
+        subtitle: string;
+        panel?: PanelType;
+        action?: () => void;
+    }[] = [
+        { icon: 'fa-tachometer-alt', title: 'لوحة التحكم', subtitle: 'نظرة عامة على تقدمك', panel: PanelType.Dashboard },
+        { icon: 'fa-sitemap', title: 'الفهرس الموضوعي', subtitle: 'تصفح الآيات حسب الموضوع', panel: PanelType.ThematicIndex },
+        { icon: 'fa-mosque', title: 'أوقات الصلاة', subtitle: 'القبلة ومواقيت الصلاة', panel: PanelType.PrayerTimes },
+        { icon: 'fa-download', title: 'المحتوى بدون انترنت', subtitle: 'تحميل السور والتلاوات', panel: PanelType.OfflineManager },
         { icon: 'fa-chart-line', title: 'الإحصائيات', subtitle: 'تابع تقدمك في القراءة', panel: PanelType.Statistics },
         { icon: 'fa-calendar-check', title: 'الختمات', subtitle: 'أنشئ وتابع ختماتك للقرآن', panel: PanelType.Khatmahs },
         { icon: 'fa-praying-hands', title: 'الأدعية', subtitle: 'أدعية من القرآن والسنة', panel: PanelType.Supplications },
         { icon: 'fa-stream', title: 'التسبيح', subtitle: 'عداد التسبيح الإلكتروني', panel: PanelType.Tasbeeh },
         { icon: 'fa-pen-alt', title: 'الملاحظات', subtitle: 'دون ملاحظاتك وتأملاتك', panel: PanelType.Notes },
-        { icon: 'fa-bookmark', title: 'المفضلة', subtitle: 'الآيات التي قمت بحفظها', panel: PanelType.Bookmarks },
-        { icon: 'fa-brain', title: 'وضع التحفيظ', subtitle: 'احفظ القرآن بالتعرف على الصوت', action: () => actions.setReadingMode(ReadingMode.Memorization) },
+        { icon: 'fa-cog', title: 'الإعدادات', subtitle: 'تخصيص مظهر التطبيق والصوت', panel: PanelType.Settings },
     ];
 
     return (
@@ -28,13 +37,14 @@ export const MenuPanel: React.FC = () => {
                         className="menu-item flex items-center gap-4 px-4 py-3 cursor-pointer hover:bg-bg-secondary transition-colors animate-listItemEnter"
                         style={{ animationDelay: `${index * 50}ms` }}
                     >
-                        <div className="w-8 h-8 flex items-center justify-center">
-                           <i className={`fas ${item.icon} text-primary text-xl w-6 text-center`}></i>
+                        <div className="w-10 h-10 flex items-center justify-center bg-primary/10 text-primary rounded-lg">
+                           <i className={`fas ${item.icon} text-xl w-6 text-center`}></i>
                         </div>
                         <div>
                             <h4 className="font-bold text-text-primary">{item.title}</h4>
                             <p className="text-xs text-text-secondary">{item.subtitle}</p>
                         </div>
+                         <i className="fas fa-chevron-left text-text-tertiary mr-auto"></i>
                     </div>
                 ))}
             </div>
@@ -43,8 +53,6 @@ export const MenuPanel: React.FC = () => {
 };
 
 // --- In-file Panel Definitions ---
-// To adhere to project constraints, new panel components are defined within this file.
-
 const EmptyState: React.FC<{icon: string; title: string; subtitle: string; cta?: React.ReactNode}> = ({icon, title, subtitle, cta}) => (
     <div className="text-center py-10 px-4 text-text-secondary flex flex-col items-center justify-center h-full">
         <i className={`fas ${icon} text-4xl mb-4`}></i>
@@ -184,7 +192,6 @@ export const TasbeehPanel: React.FC = () => {
 
     const sortedCounters = useMemo(() => [...tasbeehCounters].sort((a, b) => a.name.localeCompare(b.name, 'ar')), [tasbeehCounters]);
     
-    // Effect to robustly manage the active counter, handling initialization and updates on deletion.
     useEffect(() => {
         const hasCounters = sortedCounters.length > 0;
 
@@ -207,7 +214,6 @@ export const TasbeehPanel: React.FC = () => {
         }
     }, [sortedCounters, activeCounterId]);
 
-    // Effect to persist the last active counter ID.
     useEffect(() => {
         if (activeCounterId) {
             localStorage.setItem('lastActiveTasbeehId', activeCounterId);
@@ -216,7 +222,6 @@ export const TasbeehPanel: React.FC = () => {
         }
     }, [activeCounterId, tasbeehCounters.length]);
     
-    // Effect to add default counters on the first load if none exist.
     useEffect(() => {
         if (isInitialLoad.current && tasbeehCounters.length === 0) {
             actions.addTasbeehCounter({ name: "سبحان الله", target: 33 });
@@ -230,9 +235,9 @@ export const TasbeehPanel: React.FC = () => {
 
     const handleIncrement = () => {
         if (!activeCounter) return;
+        try { window.navigator.vibrate(10); } catch(e) {}
         const newCount = activeCounter.count + 1;
         actions.updateTasbeehCounter(activeCounter.id, newCount);
-        try { window.navigator.vibrate(50); } catch(e) {}
         
         if (newCount >= activeCounter.target) {
              try { window.navigator.vibrate([100, 30, 100]); } catch(e) {}
@@ -246,8 +251,6 @@ export const TasbeehPanel: React.FC = () => {
     
     const handleDelete = (id: string) => {
         if (window.confirm('هل أنت متأكد من حذف هذا الذكر؟')) {
-            // If the deleted counter is the active one, we need to pick a new one.
-            // Setting it to null will trigger the useEffect to pick a new valid one.
             if (activeCounterId === id) {
                 setActiveCounterId(null);
             }
@@ -274,7 +277,6 @@ export const TasbeehPanel: React.FC = () => {
     return (
         <Panel id={PanelType.Tasbeeh} title="التسبيح" headerActions={headerActions}>
             <div className="flex flex-col h-full bg-bg-primary">
-                {/* List of Counters Area */}
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-2">
                     {sortedCounters.map(counter => {
                         const isActive = activeCounterId === counter.id;
@@ -296,7 +298,6 @@ export const TasbeehPanel: React.FC = () => {
                     </button>
                 </div>
 
-                {/* Main Counter Area */}
                 <div className="flex-shrink-0 flex flex-col items-center justify-center p-6 relative bg-bg-secondary border-t-2 border-border">
                     {activeCounter ? (
                          <>
@@ -366,7 +367,6 @@ export const NotesPanel: React.FC = () => {
                 surahName: surah?.name_arabic || '',
             });
             setNoteText('');
-            // Clear the target so it doesn't re-trigger
             actions.setState(s => ({ ...s, noteVerseTarget: null }));
         }
     }, [noteVerseTarget, state.surahs, actions]);
@@ -446,6 +446,5 @@ export const duaData = [
     },
 ];
 
-// Default export must be present.
 const DefaultExport = MenuPanel;
 export default DefaultExport;

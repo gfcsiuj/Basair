@@ -21,7 +21,7 @@
             theme: {
                 extend: {
                     fontFamily: {
-                        'arabic': ['Amiri Quran', 'serif'],
+                        'arabic': ['p1-v1', 'serif'],
                         'ui': ['Rubik', 'sans-serif'],
                         'indopak': ['Scheherazade New', 'serif'],
                         'noto': ['Noto Naskh Arabic', 'serif'],
@@ -47,7 +47,7 @@
                         slideInDown: { 'from': { transform: 'translateY(-100%)', opacity: 0 }, 'to': { transform: 'translateY(0)', opacity: 1 } },
                         slideOutUp: { 'from': { transform: 'translateY(0)', opacity: 1 }, 'to': { transform: 'translateY(-100%)', opacity: 0 } },
                         scaleIn: { 'from': { transform: 'scale(0.95)', opacity: 0 }, 'to': { transform: 'scale(1)', opacity: 1 } },
-                        scaleOut: { 'from': { transform: 'scale(1)', opacity: 1 }, 'to': { transform: 'scale(0.95)', opacity: 0 } },
+                        scaleOut: { 'from': { transform: 'scale(0.95)', opacity: 1 }, 'to': { transform: 'scale(1)', opacity: 0 } },
                         pageTransition: { 'from': { opacity: 0, transform: 'translateY(10px)' }, 'to': { opacity: 1, transform: 'translateY(0)' } },
                         listItemEnter: { 'from': { opacity: 0, transform: 'translateY(10px)' }, 'to': { opacity: 1, transform: 'translateY(0)' } },
                         pulseWaiting: {
@@ -57,6 +57,10 @@
                          pulseIcon: {
                             '0%, 100%': { transform: 'translate(-50%, -50%) scale(1)', opacity: 1 },
                             '50%': { transform: 'translate(-50%, -50%) scale(1.1)', opacity: 0.8 },
+                        },
+                        bookOpen: {
+                            '0%': { transform: 'rotateY(-15deg) scale(0.95)', opacity: 0.5 },
+                            '100%': { transform: 'rotateY(0deg) scale(1)', opacity: 1 },
                         }
                     },
                     animation: {
@@ -72,6 +76,7 @@
                         listItemEnter: 'listItemEnter 0.4s cubic-bezier(0.165, 0.84, 0.44, 1) forwards',
                         pulseWaiting: 'pulseWaiting 2s infinite',
                         pulseIcon: 'pulseIcon 1.5s infinite ease-in-out',
+                        bookOpen: 'bookOpen 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
                     }
                 }
             }
@@ -114,6 +119,130 @@
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 10px; }
+
+        /* --- New 3D Book Layout Styles --- */
+        .desktop-book-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            perspective: 2500px;
+            padding: 2rem;
+            user-select: none;
+        }
+        .book-spread {
+            position: relative;
+            display: flex;
+            width: 100%;
+            max-width: 1400px;
+            aspect-ratio: 2 / 1.45;
+            transform-style: preserve-3d;
+            animation: bookOpen 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.2), 0 0 5px rgba(0,0,0,0.1);
+        }
+        .book-spread .page {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: var(--bg-primary);
+            position: relative;
+            padding: 2rem;
+        }
+        .page-on-left {
+            border-top-left-radius: 8px;
+            border-bottom-left-radius: 8px;
+            box-shadow: inset 2px 0 10px -5px rgba(0,0,0,0.2);
+        }
+        .page-on-right {
+            border-top-right-radius: 8px;
+            border-bottom-right-radius: 8px;
+            box-shadow: inset -2px 0 10px -5px rgba(0,0,0,0.2);
+        }
+        /* Page Reflection Effect */
+        .page::after, .flipping-page-front::after, .flipping-page-back::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            opacity: 0;
+            transition: opacity 0.4s ease-in-out;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .page-on-left::after, .flipping-page-front::after {
+             background: linear-gradient(to right, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.05) 30%, rgba(255, 255, 255, 0.3) 98%, rgba(0, 0, 0, 0.15) 100%);
+        }
+        .page-on-right::after, .flipping-page-back::after {
+             background: linear-gradient(to left, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.05) 30%, rgba(255, 255, 255, 0.3) 98%, rgba(0, 0, 0, 0.15) 100%);
+        }
+        .book-spread:hover .page::after {
+            opacity: 1;
+        }
+
+        /* Spine Shadow */
+        .book-spread::before {
+            content: '';
+            position: absolute;
+            top: 1%; bottom: 1%;
+            left: 50%;
+            width: 10px;
+            transform: translateX(-50%);
+            background: linear-gradient(to right, rgba(0,0,0,0), rgba(0,0,0,0.1) 40%, rgba(0,0,0,0.1) 60%, rgba(0,0,0,0));
+            z-index: 20;
+        }
+        .page-cover {
+            width: 100%; height: 100%;
+            background-color: var(--bg-secondary);
+            border-radius: inherit;
+        }
+
+        /* Page Turn Interaction & Animation */
+        .turn-hotspot {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 80px;
+            z-index: 20;
+            cursor: pointer;
+        }
+        .turn-hotspot-next { left: 0; }
+        .turn-hotspot-prev { right: 0; }
+        
+        .flipping-page-wrapper {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            width: 50%;
+            z-index: 15;
+            pointer-events: none;
+        }
+        .flipping-page {
+            width: 100%;
+            height: 100%;
+            transform-style: preserve-3d;
+            transition: transform 0.5s cubic-bezier(0.1, 0.5, 0.5, 1);
+        }
+        .flipping-page-front, .flipping-page-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            background-color: var(--bg-primary);
+        }
+        .flipping-page-back {
+            transform: rotateY(180deg);
+        }
+
+        @font-face {
+          font-family: 'surah-header';
+          src: url('https://static-cdn.tarteel.ai/qul/fonts/surah-names/surah-header/QCF_SurahHeader_COLOR-Regular.ttf');
+          font-display: swap;
+        }
+        @font-face {
+          font-family: 'p1-v1';
+          src: url('https://static-cdn.tarteel.ai/qul/fonts/quran_fonts/v1/ttf.ttf');
+          font-display: swap;
+        }
     </style>
 <script type="importmap">
 {
@@ -121,7 +250,11 @@
     "react/": "https://aistudiocdn.com/react@^19.1.1/",
     "react": "https://aistudiocdn.com/react@^19.1.1",
     "@google/genai": "https://aistudiocdn.com/@google/genai@^1.21.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/"
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
+    "vite": "https://aistudiocdn.com/vite@^7.1.7",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.0.4",
+    "path": "https://aistudiocdn.com/path@^0.12.7",
+    "url": "https://aistudiocdn.com/url@^0.11.4"
   }
 }
 </script>

@@ -18,6 +18,17 @@ export enum Panel {
     Supplications = 'supplications',
     Tasbeeh = 'tasbeeh',
     Notes = 'notes',
+    Dashboard = 'dashboard',
+    ThematicIndex = 'thematic_index',
+    PrayerTimes = 'prayer_times',
+    OfflineManager = 'offline_manager',
+    Audio = 'audio',
+}
+
+export enum RepeatMode {
+    Off = 'off',
+    One = 'one',
+    All = 'all',
 }
 
 export type Theme = 'light' | 'dark' | 'sepia' | 'blue';
@@ -43,6 +54,10 @@ export interface Reciter {
     id: number;
     reciter_name: string;
     style: string;
+    translated_name?: {
+        name: string;
+        language_name: string;
+    };
 }
 
 export interface Tafsir {
@@ -149,6 +164,8 @@ export interface SearchResponse {
     }
 }
 
+export type DownloadStatus = 'downloading' | 'paused' | 'completed' | 'error' | 'deleting';
+
 export interface AppState {
     isInitialized: boolean;
     currentPage: number;
@@ -158,7 +175,10 @@ export interface AppState {
     readingMode: ReadingMode;
     surahs: Surah[];
     reciters: Reciter[];
-    pageData: Verse[] | null;
+    pageData: {
+        left: Verse[] | null;
+        right: Verse[] | null;
+    };
     isLoading: boolean;
     error: string | null;
     activePanel: Panel | null;
@@ -181,10 +201,31 @@ export interface AppState {
     selectedTranslationId: number;
     playingVerseHighlightColor: string;
     isUIVisible: boolean;
-    lastActivityTimestamp: number;
     showShareImageModal: boolean;
     isAIAssistantOpen: boolean;
     aiAutoPrompt: string | null;
+    isFirstLaunch: boolean;
+    selectedWord: { verse: Verse, word: Word } | null;
+    playbackRate: number;
+    memorizationStats: { points: number; streak: number };
+    downloadProgress: { [key: string]: { loaded: number; total: number; status: DownloadStatus } };
+    offlineStatus: {
+        quranText: boolean;
+        reciters: number[];
+        translations: number[];
+    };
+    repeatMode: RepeatMode;
+    audioDuration: number;
+    audioCurrentTime: number;
+    isVerseByVerseLayout: boolean;
+    favoriteReciters: number[];
+    isReciterModalOpen: boolean;
+    isRangeModalOpen: boolean;
+}
+
+export type DownloadableItem = {
+    id: number | string;
+    name: string;
 }
 
 export interface AppActions {
@@ -198,6 +239,7 @@ export interface AppActions {
     togglePlayPause: () => void;
     playNext: () => void;
     playPrev: () => void;
+    playRange: (startVerseKey: string, endVerseKey: string) => Promise<void>;
     toggleBookmark: (verse: Verse) => void;
     addKhatmah: (khatmah: Omit<Khatmah, 'id' | 'completed' | 'pagesRead'>) => void;
     updateKhatmahProgress: (id: string, pagesRead: number) => void;
@@ -218,6 +260,15 @@ export interface AppActions {
     setState: Dispatch<SetStateAction<AppState>>;
     recordUserActivity: () => void;
     toggleUIVisibility: () => void;
+    selectWord: (verse: Verse, word: Word) => void;
+    setPlaybackRate: (rate: number) => void;
+    addMemorizationPoints: (points: number) => void;
+    startDownload: (type: 'quranText' | 'reciter' | 'translation', item: DownloadableItem) => Promise<void>;
+    deleteDownloadedContent: (type: 'quranText' | 'reciter' | 'translation', id: number | string) => Promise<void>;
+    setRepeatMode: (mode: RepeatMode) => void;
+    toggleVerseByVerseLayout: () => void;
+    getPageData: (pageNumber: number) => Promise<Verse[] | null>;
+    toggleFavoriteReciter: (id: number) => void;
 }
 
 export interface AppContextType {
