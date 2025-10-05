@@ -52,7 +52,7 @@ const MainReadingInterface: React.FC = () => {
             const cssRules = pagesToLoad.map(page => `
                 @font-face {
                     font-family: 'quran-font-p${page}';
-                    src: url('/ZPCV1Font/p${page}.ttf') format('truetype');
+                    src: url('ZPCV1Font/p${page}.ttf') format('truetype');
                     font-display: swap;
                 }
             `).join('\n');
