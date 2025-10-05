@@ -1,4 +1,5 @@
 
+
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { GoogleGenAI } from "@google/genai";
 import { Surah, Verse, Reciter, Tafsir, Translation, Bookmark, Khatmah, AppState, AppContextType, Panel, Theme, Font, ReadingMode, AyahWordState, SearchResponse, Note, TasbeehCounter, Word, DownloadableItem, RepeatMode } from './types';
@@ -260,7 +261,6 @@ const App: React.FC = () => {
         favoriteReciters: JSON.parse(localStorage.getItem('favoriteReciters') || '[]'),
         isReciterModalOpen: false,
         isRangeModalOpen: false,
-        // FIX: Add missing 'glyphData' property to the initial state to match the AppState type.
         glyphData: null,
     });
     
@@ -553,11 +553,12 @@ const App: React.FC = () => {
                 const quranTextStatus = await offlineManager.isQuranTextDownloaded();
                 const recitersStatus = await offlineManager.getDownloadedReciters();
 
-                const [chaptersData, recitationsData, tafsirsData, translationsData] = await Promise.all([
+                const [chaptersData, recitationsData, tafsirsData, translationsData, glyphData] = await Promise.all([
                     fetchWithRetry<{ chapters: Surah[] }>(`${API_BASE}/chapters?language=ar`),
                     fetchWithRetry<{ recitations: Reciter[] }>(`${API_BASE}/resources/recitations?language=ar`),
                     fetchWithRetry<{ tafsirs: Tafsir[] }>(`${API_BASE}/resources/tafsirs?language=ar`),
                     fetchWithRetry<{ translations: Translation[] }>(`${API_BASE}/resources/translations?language=ar`),
+                    fetch('/qpc-v1-ayah-by-ayah-glyphs.json').then(res => res.json())
                 ]);
 
                 const processedApiReciters = recitationsData.recitations.map(reciter => ({
@@ -577,7 +578,8 @@ const App: React.FC = () => {
                     tafsirs: tafsirsData.tafsirs,
                     translations: translationsData.translations,
                     ai: aiInstance,
-                    offlineStatus: { ...s.offlineStatus, quranText: quranTextStatus, reciters: recitersStatus }
+                    offlineStatus: { ...s.offlineStatus, quranText: quranTextStatus, reciters: recitersStatus },
+                    glyphData: glyphData,
                 }));
                 await loadPage(state.currentPage);
                 
