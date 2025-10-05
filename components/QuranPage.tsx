@@ -26,20 +26,32 @@ const QuranPage: React.FC<QuranPageProps> = ({ pageVerses }) => {
         return <div className="p-6 text-center text-red-500">{error}</div>;
     }
 
-    if (!pageVerses) {
-        return null; // Or some placeholder
+    if (!pageVerses || pageVerses.length === 0) {
+        return null;
     }
 
-    const fontClass = {
-        arabic: 'font-arabic',
-        indopak: 'font-indopak',
-        noto: 'font-noto',
-    }[font];
+    const pageNumber = pageVerses[0].page_number;
+
+    const pageStyle: React.CSSProperties = {
+        fontSize: `${fontSize}px`,
+        lineHeight: 2.8
+    };
+    let fontClassName = '';
+
+    if (font === 'qpc-v1' && pageNumber) {
+        pageStyle.fontFamily = `'quran-font-p${pageNumber}'`;
+    } else {
+        fontClassName = {
+            arabic: 'font-arabic',
+            indopak: 'font-indopak',
+            noto: 'font-noto',
+        }[font] || '';
+    }
 
     // New Verse-by-Verse Layout
     if (isVerseByVerseLayout) {
         return (
-            <div className={`w-full max-w-2xl animate-pageTransition ${fontClass}`} style={{ fontSize: `${fontSize}px` }}>
+            <div className={`w-full max-w-2xl animate-pageTransition ${fontClassName}`} style={pageStyle}>
                 {pageVerses.map(verse => {
                     let headerContent = null;
                     if (verse.verse_number === 1) {
@@ -73,8 +85,8 @@ const QuranPage: React.FC<QuranPageProps> = ({ pageVerses }) => {
     return (
         <div className="w-full animate-pageTransition overflow-y-auto custom-scrollbar">
             <div 
-              className={`text-right text-justify leading-loose ${fontClass}`}
-              style={{ fontSize: `${fontSize}px`, lineHeight: 2.8 }}
+              className={`text-right text-justify leading-loose ${fontClassName}`}
+              style={pageStyle}
             >
                 {pageVerses.map(verse => {
                     let headerContent = null;

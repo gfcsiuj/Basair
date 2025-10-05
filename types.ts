@@ -32,7 +32,7 @@ export enum RepeatMode {
 }
 
 export type Theme = 'light' | 'dark' | 'sepia' | 'blue';
-export type Font = 'arabic' | 'indopak' | 'noto';
+export type Font = 'arabic' | 'indopak' | 'noto' | 'qpc-v1';
 
 export interface Surah {
     id: number;
@@ -221,6 +221,7 @@ export interface AppState {
     favoriteReciters: number[];
     isReciterModalOpen: boolean;
     isRangeModalOpen: boolean;
+    glyphData: { [key: string]: { text: string } } | null;
 }
 
 export type DownloadableItem = {

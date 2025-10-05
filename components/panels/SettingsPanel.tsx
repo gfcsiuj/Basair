@@ -26,6 +26,7 @@ const SettingsPanel: React.FC = () => {
     
     const fonts: { id: Font; name: string }[] = [
         { id: 'arabic', name: 'الخط العثماني' },
+        { id: 'qpc-v1', name: 'خط النسخ (QPC v1)' },
         { id: 'indopak', name: 'هندي-باكستاني' },
         { id: 'noto', name: 'نسخ' },
     ];

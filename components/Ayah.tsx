@@ -8,6 +8,7 @@ interface AyahProps {
 
 const Ayah: React.FC<AyahProps> = ({ verse }) => {
     const { state, actions } = useApp();
+    const { font } = state;
 
     const isPlaying = state.isPlaying && state.audioQueue[state.currentAudioIndex]?.verseKey === verse.verse_key;
 
@@ -48,6 +49,29 @@ const Ayah: React.FC<AyahProps> = ({ verse }) => {
 
     const verseNumberArabic = new Intl.NumberFormat('ar-EG').format(verse.verse_number);
 
+    const renderVerseNumber = () => (
+        <span 
+            onClick={() => actions.selectAyah(verse)}
+            className="inline-flex items-center justify-center w-7 h-7 rounded-full border-2 border-primary/20 text-primary font-ui mx-1 select-none text-sm cursor-pointer"
+        >
+            {verseNumberArabic}
+        </span>
+    );
+    
+    if (font === 'qpc-v1' && state.glyphData && state.glyphData[verse.verse_key]) {
+        return (
+             <span 
+                className={`ayah-container inline relative ${isPlaying ? 'bg-emerald-500/20 rounded-md' : ''} transition-colors duration-300`}
+            >
+                <span onClick={() => actions.selectAyah(verse)} className="cursor-pointer">
+                    {state.glyphData[verse.verse_key].text}
+                </span>
+                {' '}
+                {renderVerseNumber()}
+            </span>
+        )
+    }
+
     return (
         <span 
             className={`ayah-container inline relative ${isPlaying ? 'bg-emerald-500/20 rounded-md' : ''} transition-colors duration-300`}
@@ -71,12 +95,7 @@ const Ayah: React.FC<AyahProps> = ({ verse }) => {
                  </React.Fragment>
             ))}
             
-            <span 
-                onClick={() => actions.selectAyah(verse)}
-                className="inline-flex items-center justify-center w-7 h-7 rounded-full border-2 border-primary/20 text-primary font-ui mx-1 select-none text-sm cursor-pointer"
-            >
-                {verseNumberArabic}
-            </span>
+            {renderVerseNumber()}
         </span>
     );
 };

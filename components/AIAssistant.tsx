@@ -38,10 +38,46 @@ const AIAssistant: React.FC = () => {
     const { isAIAssistantOpen, aiAutoPrompt, activePanel } = state;
 
     const [isRendered, setIsRendered] = useState(isAIAssistantOpen);
+    
+    // Swipe to dismiss state
+    const [translateY, setTranslateY] = useState(0);
+    const [isDragging, setIsDragging] = useState(false);
+    const touchStartY = useRef(0);
+
+    const onDismiss = useCallback(() => {
+        actions.setState(s => ({ ...s, isAIAssistantOpen: false }));
+    }, [actions]);
+
+    const handleTouchStart = (e: React.TouchEvent) => {
+        touchStartY.current = e.touches[0].clientY;
+        setIsDragging(true);
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+        const currentY = e.touches[0].clientY;
+        let deltaY = currentY - touchStartY.current;
+        if (deltaY < 0) deltaY = 0; // Prevent dragging up
+        setTranslateY(deltaY);
+    };
+
+    const handleTouchEnd = () => {
+        setIsDragging(false);
+        if (translateY > 80) { // Threshold
+            onDismiss();
+        } else {
+            setTranslateY(0);
+        }
+    };
+
+    const panelStyle: React.CSSProperties = {
+        transform: `translateY(${translateY}px)`,
+        transition: isDragging ? 'none' : 'transform 0.3s ease-out',
+    };
 
     useEffect(() => {
         if (isAIAssistantOpen) {
             setIsRendered(true);
+            setTranslateY(0); // Reset position when opening
         }
     }, [isAIAssistantOpen]);
 
@@ -266,16 +302,22 @@ const AIAssistant: React.FC = () => {
                 <div 
                     onAnimationEnd={handleAnimationEnd}
                     className={`ai-window fixed inset-0 md:inset-auto md:bottom-[calc(8.75rem+env(safe-area-inset-bottom,0rem))] md:left-5 md:right-auto md:w-96 md:h-[60vh] md:max-h-[500px] bg-bg-primary border border-border md:rounded-2xl shadow-xl flex flex-col z-40 ${isAIAssistantOpen ? 'animate-slideInUp' : 'animate-slideOutDown'}`}
+                    style={panelStyle}
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
                 >
+                    <div className="w-full flex justify-center pt-3 shrink-0">
+                         <div className="w-12 h-1.5 bg-bg-tertiary rounded-full"></div>
+                    </div>
                     <div 
-                        className="panel-header flex items-center justify-between p-3 bg-gradient-to-l from-primary to-primary-light text-white md:rounded-t-2xl shrink-0"
-                        style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top, 0rem))' }}
+                        className="panel-header flex items-center justify-between p-3 text-text-primary md:rounded-t-2xl shrink-0"
                     >
                         <div className="flex items-center gap-3">
-                            <i className="fas fa-robot"></i>
+                            <i className="fas fa-robot text-primary"></i>
                             <h3 className="font-bold">المساعد الذكي: عبد الحكيم</h3>
                         </div>
-                        <button onClick={() => actions.setState(s => ({...s, isAIAssistantOpen: false}))} className="p-2 hover:bg-white/10 rounded-full md:hidden"><i className="fas fa-times"></i></button>
+                        <button onClick={onDismiss} className="p-2 hover:bg-bg-secondary rounded-full md:hidden"><i className="fas fa-times"></i></button>
                     </div>
 
                     <div className="flex-1 p-4 overflow-y-auto custom-scrollbar">

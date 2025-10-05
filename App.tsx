@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { GoogleGenAI } from "@google/genai";
 import { Surah, Verse, Reciter, Tafsir, Translation, Bookmark, Khatmah, AppState, AppContextType, Panel, Theme, Font, ReadingMode, AyahWordState, SearchResponse, Note, TasbeehCounter, Word, DownloadableItem, RepeatMode } from './types';
@@ -259,6 +260,8 @@ const App: React.FC = () => {
         favoriteReciters: JSON.parse(localStorage.getItem('favoriteReciters') || '[]'),
         isReciterModalOpen: false,
         isRangeModalOpen: false,
+        // FIX: Add missing 'glyphData' property to the initial state to match the AppState type.
+        glyphData: null,
     });
     
     // --- API & Data Loading ---

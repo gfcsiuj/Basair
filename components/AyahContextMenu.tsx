@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../hooks/useApp';
 import { API_BASE, AUDIO_BASE } from '../constants';
-import { Panel, RepeatMode } from ' ../../types';
+import { Panel, RepeatMode } from '../../types';
 
 const AyahContextMenu: React.FC = () => {
     const { state, actions } = useApp();
@@ -189,7 +189,7 @@ const AyahContextMenu: React.FC = () => {
     }
 
     return (
-<>
+        <>
             <div className={`fixed inset-0 bg-black/30 backdrop-blur-sm z-40 ${isVisible ? 'animate-fadeIn' : 'animate-fadeOut'}`} onClick={onDismiss}></div>
             <div 
                 onAnimationEnd={handleAnimationEnd}
