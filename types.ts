@@ -1,6 +1,7 @@
 // FIX: Import Dispatch and SetStateAction from react to resolve namespace error.
 import type { Dispatch, SetStateAction } from 'react';
 import { GoogleGenAI } from "@google/genai";
+import type { Database } from 'sql.js';
 
 export enum ReadingMode {
     Reading = 'reading',
@@ -221,7 +222,8 @@ export interface AppState {
     favoriteReciters: number[];
     isReciterModalOpen: boolean;
     isRangeModalOpen: boolean;
-    wordGlyphData: { [key: string]: { text: string } } | null;
+    wordGlyphData: { [key: string]: { id: number; text: string } } | null;
+    layoutDb: Database | null;
     prayerTimes: { [key: string]: string; } | null;
     locationName: string | null;
     prayerTimesStatus: 'idle' | 'loading' | 'success' | 'error';

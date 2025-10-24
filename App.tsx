@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { GoogleGenAI } from "@google/genai";
+import initSqlJs, { type Database } from 'sql.js';
 import { Surah, Verse, Reciter, Tafsir, Translation, Bookmark, Khatmah, AppState, AppContextType, Panel, Theme, Font, ReadingMode, AyahWordState, SearchResponse, Note, TasbeehCounter, Word, DownloadableItem, RepeatMode } from './types';
 import { API_BASE, AUDIO_BASE, TOTAL_PAGES } from './constants';
 import * as offlineManager from './offlineManager';
@@ -263,6 +264,7 @@ const App: React.FC = () => {
         isReciterModalOpen: false,
         isRangeModalOpen: false,
         wordGlyphData: null,
+        layoutDb: null,
         prayerTimes: null,
         locationName: null,
         prayerTimesStatus: 'idle',
@@ -617,13 +619,17 @@ const App: React.FC = () => {
                 const quranTextStatus = await offlineManager.isQuranTextDownloaded();
                 const recitersStatus = await offlineManager.getDownloadedReciters();
 
-                const [chaptersData, recitationsData, tafsirsData, translationsData, wordGlyphData] = await Promise.all([
+                const [chaptersData, recitationsData, tafsirsData, translationsData, wordGlyphData, dbBuffer] = await Promise.all([
                     fetchWithRetry<{ chapters: Surah[] }>(`${API_BASE}/chapters?language=ar`),
                     fetchWithRetry<{ recitations: Reciter[] }>(`${API_BASE}/resources/recitations?language=ar`),
                     fetchWithRetry<{ tafsirs: Tafsir[] }>(`${API_BASE}/resources/tafsirs?language=ar`),
                     fetchWithRetry<{ translations: Translation[] }>(`${API_BASE}/resources/translations?language=ar`),
-                    fetch('/qpc-v4.json').then(res => res.json())
+                    fetch('/qpc-v4.json').then(res => res.json()),
+                    fetch('/qpc-v4-tajweed-15-lines.db').then(res => res.arrayBuffer())
                 ]);
+
+                const SQL = await initSqlJs({ locateFile: file => `/${file}` });
+                const db = new SQL.Database(new Uint8Array(dbBuffer));
 
                 const processedApiReciters = recitationsData.recitations.map(reciter => ({
                     ...reciter,
@@ -644,6 +650,7 @@ const App: React.FC = () => {
                     ai: aiInstance,
                     offlineStatus: { ...s.offlineStatus, quranText: quranTextStatus, reciters: recitersStatus },
                     wordGlyphData: wordGlyphData,
+                    layoutDb: db,
                 }));
                 await loadPage(state.currentPage);
                 

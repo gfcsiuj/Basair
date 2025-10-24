@@ -1,35 +1,130 @@
-import React, { useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../hooks/useApp';
-import Ayah from './Ayah';
-import { Verse } from '../types';
+import Bismillah from './Bismillah';
 import SurahHeader from './SurahHeader';
+import { Verse } from '../types';
+
+interface LineData {
+    line_number: number;
+    line_type: 'surah_name' | 'basmallah' | 'ayah';
+    is_centered: number; // 0 or 1
+    first_word_id: number | null;
+    last_word_id: number | null;
+    surah_number: number | null;
+}
 
 const QuranPage: React.FC<{
     pageVerses: Verse[] | null;
 }> = ({ pageVerses }) => {
     const { state } = useApp();
-    const { isLoading, error, font, fontSize, isVerseByVerseLayout, surahs, wordGlyphData } = state;
+    const { isLoading, error, font, fontSize, surahs, wordGlyphData, layoutDb, currentPage } = state;
+    const [linesForPage, setLinesForPage] = useState<LineData[]>([]);
 
-    const processedVerses = useMemo(() => {
-        if (!pageVerses) return [];
-        // Only process for the qpc-v1 font, otherwise return original verses
-        if (font !== 'qpc-v1' || !wordGlyphData) {
-            return pageVerses.map(v => ({...v, glyphText: ''}));
-        };
+    // Effect to load page-specific font
+    useEffect(() => {
+        const styleId = 'dynamic-quran-font-style';
+        let styleEl = document.getElementById(styleId) as HTMLStyleElement;
 
-        return pageVerses.map(verse => {
-            const verseKeyPrefix = `${verse.chapter_id}:${verse.verse_number}:`;
-            const verseGlyphText = Object.entries(wordGlyphData)
-                .filter(([key]) => key.startsWith(verseKeyPrefix))
-                .map(([key, wordInfo]) => ({ ...wordInfo, wordNum: parseInt(key.split(':')[2], 10) }))
-                .sort((a, b) => a.wordNum - b.wordNum)
-                .map(wordInfo => (wordInfo as any).text)
-                .join('');
-            return { ...verse, glyphText: verseGlyphText };
+        if (!styleEl) {
+            styleEl = document.createElement('style');
+            styleEl.id = styleId;
+            document.head.appendChild(styleEl);
+        }
+
+        if (font === 'qpc-v1' && currentPage > 0) {
+            const page = currentPage;
+            const cssRule = `
+                @font-face {
+                    font-family: 'QuranPageFontV2';
+                    src: url('/QPC V2 Font/p${page}.ttf') format('truetype');
+                    font-display: block;
+                }
+            `;
+            if (styleEl.innerHTML !== cssRule) {
+                styleEl.innerHTML = cssRule;
+            }
+        } else {
+            if (styleEl.innerHTML !== '') styleEl.innerHTML = '';
+        }
+    }, [currentPage, font]);
+
+    // Effect to query line data from DB
+    useEffect(() => {
+        if (layoutDb && currentPage) {
+            try {
+                const stmt = layoutDb.prepare(`
+                    SELECT line_number, line_type, is_centered, first_word_id, last_word_id, surah_number 
+                    FROM pages 
+                    WHERE page_number = :page
+                    ORDER BY line_number ASC
+                `);
+                stmt.bind({ ':page': currentPage });
+                const lines: LineData[] = [];
+                while (stmt.step()) {
+                    lines.push(stmt.getAsObject() as unknown as LineData);
+                }
+                stmt.free();
+                setLinesForPage(lines);
+            } catch (err) {
+                console.error(`Failed to query page ${currentPage}:`, err);
+                setLinesForPage([]);
+            }
+        }
+    }, [layoutDb, currentPage]);
+    
+    // Memoize word glyphs into a Map for fast O(1) lookups
+    const memoizedWordGlyphsById = useMemo(() => {
+        if (!wordGlyphData) return null;
+        const map = new Map<number, string>();
+        for (const wordInfo of Object.values(wordGlyphData)) {
+            map.set(wordInfo.id, wordInfo.text);
+        }
+        return map;
+    }, [wordGlyphData]);
+
+    // Memoize the entire rendered page content for performance
+    const pageContent = useMemo(() => {
+        if (!linesForPage.length || !surahs) return null;
+
+        return linesForPage.map((line) => {
+            let lineContent: React.ReactNode = null;
+            const lineStyle: React.CSSProperties = {
+                 textAlign: line.is_centered ? 'center' : 'justify',
+            };
+
+            switch (line.line_type) {
+                case 'surah_name':
+                    const surah = surahs.find(s => s.id === line.surah_number);
+                    if (surah) {
+                        lineContent = <SurahHeader surah={surah} />;
+                    }
+                    break;
+                case 'basmallah':
+                    lineContent = <Bismillah />;
+                    break;
+                case 'ayah':
+                    if (memoizedWordGlyphsById && line.first_word_id && line.last_word_id) {
+                        let wordsInLine = '';
+                        // Efficiently build the line string using the Map
+                        for (let i = line.first_word_id; i <= line.last_word_id; i++) {
+                            wordsInLine += memoizedWordGlyphsById.get(i) || '';
+                        }
+                        lineContent = wordsInLine;
+                    }
+                    break;
+                default:
+                    lineContent = null;
+            }
+            
+            return (
+                <div key={line.line_number} style={lineStyle}>
+                    {lineContent}
+                </div>
+            );
         });
-    }, [pageVerses, wordGlyphData, font]);
+    }, [linesForPage, surahs, memoizedWordGlyphsById]);
 
-    if (isLoading && !pageVerses) { // Show loading skeleton only if there's no data yet
+    if (isLoading && !pageContent) {
         return (
             <div className="w-full h-full p-8 animate-pulse">
                 <div className="space-y-4">
@@ -43,98 +138,36 @@ const QuranPage: React.FC<{
         return <div className="p-6 text-center text-red-500">{error}</div>;
     }
 
-    if (!processedVerses || processedVerses.length === 0) {
+    if (!pageContent) {
         return null;
     }
-
-    const pageNumber = processedVerses[0].page_number;
-    const juzNumber = processedVerses[0].juz_number;
     
-    const paddedJuz = String(juzNumber).padStart(3, '0');
-    const juzLigature = `juz${paddedJuz}`;
-    const juzNameLigature = `j${paddedJuz}`;
-
-
     const pageStyle: React.CSSProperties = {
+        fontFamily: font === 'qpc-v1' ? 'QuranPageFontV2' : 'inherit',
         fontSize: `${fontSize}px`,
-        lineHeight: 2.2
+        direction: 'rtl',
+        lineHeight: 2.2,
     };
-    let fontClassName = '';
-
-    if (font === 'qpc-v1' && pageNumber) {
-        pageStyle.fontFamily = `'quran-font-p${pageNumber}'`;
-    } else {
-        fontClassName = {
-            arabic: 'font-arabic',
-            indopak: 'font-indopak',
-            noto: 'font-noto',
-        }[font] || '';
-    }
-
-    const PageJuzHeader = () => (
-         <div className="flex justify-between items-center text-lg mb-4 text-primary px-2" style={{fontFamily: 'quran-common', fontFeatureSettings: '"calt", "liga"' }}>
-            <span>{juzLigature}</span>
-            <span>{juzNameLigature}</span>
-        </div>
-    );
-
-    // New Verse-by-Verse Layout
-    if (isVerseByVerseLayout) {
-        return (
-            <div className={`w-full max-w-2xl animate-pageTransition ${fontClassName}`} style={pageStyle}>
-                <PageJuzHeader />
-                {processedVerses.map(verse => {
-                    let headerContent = null;
-                    if (verse.verse_number === 1) {
-                        const surah = surahs.find(s => s.id === verse.chapter_id);
-                        if (surah) {
-                            headerContent = <SurahHeader surah={surah} />;
-                        }
-                    }
-
-                    const tafsirText = verse.tafsirs?.[0]?.text.replace(/<[^>]*>/g, '') || 'التفسير غير متوفر.';
-
-                    return (
-                        <div key={verse.verse_key} className="mb-8 py-4 border-b border-border last:border-b-0">
-                            {headerContent}
-                            <div className="text-right" style={{ lineHeight: 2.3 }}>
-                                <Ayah verse={verse} />
-                            </div>
-                            <div className="mt-4 pr-4 border-r-2 border-primary/50">
-                                <p className="font-ui text-text-secondary" style={{ fontSize: `${Math.max(14, fontSize - 6)}px`, lineHeight: 1.8 }}>
-                                    {tafsirText}
-                                </p>
-                            </div>
-                        </div>
-                    );
-                })}
+    
+    const juzNumber = pageVerses?.[0]?.juz_number;
+    const PageJuzHeader = () => {
+         if (!juzNumber) return null;
+         const paddedJuz = String(juzNumber).padStart(3, '0');
+         const juzLigature = `juz${paddedJuz}`;
+         const juzNameLigature = `j${paddedJuz}`;
+         return (
+             <div className="flex justify-between items-center text-lg mb-4 text-primary px-2" style={{fontFamily: 'quran-common', fontFeatureSettings: '"calt", "liga"' }}>
+                <span>{juzLigature}</span>
+                <span>{juzNameLigature}</span>
             </div>
-        );
-    }
+         );
+    };
 
-    // Original Page Layout
     return (
-        <div className="w-full animate-pageTransition overflow-y-auto custom-scrollbar">
+        <div className="w-full animate-pageTransition">
             <PageJuzHeader />
-            <div 
-              className={`text-right ${fontClassName}`}
-              style={pageStyle}
-            >
-                {processedVerses.map(verse => {
-                    let headerContent = null;
-                    if (verse.verse_number === 1) {
-                        const surah = state.surahs.find(s => s.id === verse.chapter_id);
-                        if (surah) {
-                            headerContent = <SurahHeader surah={surah} />;
-                        }
-                    }
-                    return (
-                        <React.Fragment key={verse.verse_key}>
-                            {headerContent}
-                            <Ayah verse={verse} />{' '}
-                        </React.Fragment>
-                    );
-                })}
+            <div style={pageStyle}>
+                {pageContent}
             </div>
         </div>
     );

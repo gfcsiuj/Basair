@@ -30,36 +30,6 @@ const MainReadingInterface: React.FC = () => {
         return () => mediaQuery.removeEventListener('change', handleResize);
     }, [actions, state.currentPage]);
     
-    useEffect(() => {
-        const styleId = 'dynamic-quran-font-style';
-        let styleEl = document.getElementById(styleId) as HTMLStyleElement;
-
-        if (!styleEl) {
-            styleEl = document.createElement('style');
-            styleEl.id = styleId;
-            document.head.appendChild(styleEl);
-        }
-
-        if (state.font === 'qpc-v1' && state.currentPage > 0) {
-            const page = state.currentPage;
-            const cssRule = `
-                @font-face {
-                    font-family: 'quran-font-p${page}';
-                    src: url('/QPC V2 Font/p${page}.ttf') format('truetype');
-                    font-display: swap;
-                }
-            `;
-
-            if (styleEl.innerHTML !== cssRule) {
-                styleEl.innerHTML = cssRule;
-            }
-        } else {
-            if (styleEl.innerHTML !== '') {
-                styleEl.innerHTML = '';
-            }
-        }
-    }, [state.currentPage, state.font]);
-    
     const getDistance = (touches: React.TouchList) => {
         const [touch1, touch2] = [touches[0], touches[1]];
         return Math.sqrt(
