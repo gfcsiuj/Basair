@@ -125,13 +125,9 @@ const ShareImageGenerator: React.FC = () => {
     };
 
     let ayahText = selectedAyah?.text_uthmani;
-    if (config.fontFamily === 'qpc-v1' && selectedAyah && state.glyphData) {
+    if (config.fontFamily === 'qpc-v1' && selectedAyah && state.glyphData && state.glyphData[selectedAyah.verse_key]) {
         dynamicStyle.fontFamily = `'quran-font-p${selectedAyah.page_number}'`;
-        ayahText = selectedAyah.words.map(word => {
-            const key = `${selectedAyah.chapter_id}:${selectedAyah.verse_number}:${word.position}`;
-            const glyphText = state.glyphData?.[key]?.text ?? word.text_uthmani;
-            return glyphText + (word.char_type_name === 'word' ? ' ' : '');
-        }).join('').trim();
+        ayahText = state.glyphData[selectedAyah.verse_key].text;
     }
 
 

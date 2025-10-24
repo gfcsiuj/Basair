@@ -346,45 +346,17 @@ const App: React.FC = () => {
     const loadPage = useCallback(async (pageNumber: number) => {
         if (pageNumber < 1 || pageNumber > TOTAL_PAGES) return;
         setState(s => ({ ...s, isLoading: true, error: null }));
-
+    
         try {
-            const isDesktop = window.innerWidth > 1024;
-            let leftPageData: Verse[] | null = null;
-            let rightPageData: Verse[] | null = null;
-            let finalPageNum = pageNumber;
-            let pagesToLog: number[] = [];
-
             const fetchAndProcessPage = async (pageNum: number): Promise<Verse[] | null> => {
                 if (pageNum < 1 || pageNum > TOTAL_PAGES) return null;
                 const offlineData = await offlineManager.getPageData(pageNum);
                 return offlineData || await getPageData(pageNum);
             };
-
-            if (isDesktop) {
-                 // For an RTL book, the right page is an even number, the left is an odd number.
-                 // e.g., page 4 on right, page 5 on left.
-                 const rightPageNum = (pageNumber % 2 === 0) ? pageNumber : pageNumber - 1;
-                 const leftPageNum = rightPageNum + 1;
-                 
-                 // The currentPage should represent the spread. Let's use the even number (the one on the right).
-                 // Except for page 1, where it's just 1.
-                 finalPageNum = rightPageNum > 0 ? rightPageNum : 1;
-
-                const [rightResult, leftResult] = await Promise.all([
-                    fetchAndProcessPage(rightPageNum > 0 ? rightPageNum : 0),
-                    fetchAndProcessPage(leftPageNum <= TOTAL_PAGES ? leftPageNum : 0)
-                ]);
-                rightPageData = rightResult; // Data for even page
-                leftPageData = leftResult;   // Data for odd page
-                pagesToLog = [leftPageNum, rightPageNum].filter(p => p > 0 && p <= TOTAL_PAGES);
-            } else { // mobile logic
-                rightPageData = await fetchAndProcessPage(pageNumber);
-                leftPageData = null; // Ensure left page is null on mobile
-                pagesToLog = [pageNumber];
-                finalPageNum = pageNumber;
-            }
-
-            const allVerses = [...(rightPageData || []), ...(leftPageData || [])];
+    
+            const pageData = await fetchAndProcessPage(pageNumber);
+            const allVerses = pageData || [];
+            
             const audioQueue = await Promise.all(allVerses.map(async v => {
                 let audioUrl = '';
                 const offlineAudio = await offlineManager.getRecitationAudio(state.selectedReciterId, v.verse_key);
@@ -395,35 +367,30 @@ const App: React.FC = () => {
                 }
                 return { url: audioUrl, verseKey: v.verse_key };
             }));
-
+    
             setState(s => ({ 
                 ...s, 
-                currentPage: finalPageNum, 
-                pageData: { left: leftPageData, right: rightPageData }, 
+                currentPage: pageNumber, 
+                // Always render as a single page view. `right` holds the data. `left` is null.
+                pageData: { left: null, right: pageData }, 
                 audioQueue, 
                 currentAudioIndex: 0, 
                 isLoading: false 
             }));
-            localStorage.setItem('lastPage', String(finalPageNum));
+            localStorage.setItem('lastPage', String(pageNumber));
             
             const today = new Date().toISOString().split('T')[0];
             setState(s => {
                 const newLog = { ...s.readingLog };
                 if (!newLog[today]) newLog[today] = [];
-                let updated = false;
-                pagesToLog.forEach(p => {
-                    if (!newLog[today].includes(p)) {
-                        newLog[today].push(p);
-                        updated = true;
-                    }
-                });
-                if (updated) {
+                if (!newLog[today].includes(pageNumber)) {
+                    newLog[today].push(pageNumber);
                     localStorage.setItem('readingLog', JSON.stringify(newLog));
                     return { ...s, readingLog: newLog };
                 }
                 return s;
             });
-
+    
         } catch (error) {
             console.error("Failed to load page:", error);
             setState(s => ({ ...s, isLoading: false, error: 'Failed to load page data.' }));
@@ -800,14 +767,12 @@ const App: React.FC = () => {
             preloadAudioEl.load();
         }
         
-        const isDesktop = window.innerWidth > 1024;
-
         if(state.currentAudioIndex < state.audioQueue.length - 1) {
             setState(s => ({...s, currentAudioIndex: s.currentAudioIndex + 1 }));
         } else if (state.repeatMode === RepeatMode.All) {
             setState(s => ({...s, currentAudioIndex: 0 }));
         } else if (state.currentPage < TOTAL_PAGES) {
-            const nextPage = state.currentPage + (isDesktop ? 2 : 1);
+            const nextPage = state.currentPage + 1;
             loadPage(nextPage).then(() => setState(s => ({...s, isPlaying: true })));
         } else {
             setState(s => ({...s, isPlaying: false }));

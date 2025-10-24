@@ -79,37 +79,16 @@ const Ayah: React.FC<AyahProps> = ({ verse }) => {
         onTouchEnd: handleAyahInteractionEnd,
     };
     
+    // For qpc font, the font itself includes the verse number symbol.
+    // The entire ayah text becomes the interactive element.
     if (font === 'qpc-v1') {
+        const text = state.glyphData?.[verse.verse_key]?.text ?? verse.text_uthmani;
         return (
-            <span 
+             <span 
                 {...ayahEventHandlers}
                 className={`ayah-container inline relative cursor-pointer ${isPlaying ? 'bg-emerald-500/20 rounded-md' : ''} transition-colors duration-300`}
             >
-                {verse.words.map(word => {
-                    const key = `${verse.chapter_id}:${verse.verse_number}:${word.position}`;
-                    const glyphText = state.glyphData?.[key]?.text ?? word.text_uthmani;
-                    
-                    return (
-                        <React.Fragment key={word.id}>
-                            <span
-                                className={word.char_type_name === 'word' ? 'word hover:text-primary transition-colors cursor-pointer' : ''}
-                                {...(word.char_type_name === 'word' && {
-                                    onMouseDown: (e) => handlePressStart(e, word),
-                                    onMouseUp: handlePressEnd,
-                                    onMouseLeave: handlePressEnd,
-                                    onMouseMove: (e) => handlePressMove(e),
-                                    onTouchStart: (e) => handlePressStart(e, word),
-                                    onTouchEnd: handlePressEnd,
-                                    onTouchMove: (e) => handlePressMove(e),
-                                    onContextMenu: (e) => e.preventDefault(),
-                                })}
-                            >
-                                {glyphText}
-                            </span>
-                            {word.char_type_name === 'word' && ' '}
-                        </React.Fragment>
-                    );
-                })}
+                {text}
             </span>
         );
     }

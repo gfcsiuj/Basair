@@ -191,13 +191,9 @@ const AyahContextMenu: React.FC = () => {
     const fontStyle: React.CSSProperties = {};
     let ayahText = selectedAyah?.text_uthmani;
 
-    if (state.font === 'qpc-v1' && selectedAyah && state.glyphData) {
+    if (state.font === 'qpc-v1' && selectedAyah && state.glyphData && state.glyphData[selectedAyah.verse_key]) {
         fontStyle.fontFamily = `'quran-font-p${selectedAyah.page_number}'`;
-        ayahText = selectedAyah.words.map(word => {
-            const key = `${selectedAyah.chapter_id}:${selectedAyah.verse_number}:${word.position}`;
-            const glyphText = state.glyphData?.[key]?.text ?? word.text_uthmani;
-            return glyphText + (word.char_type_name === 'word' ? ' ' : '');
-        }).join('').trim();
+        ayahText = state.glyphData[selectedAyah.verse_key].text;
     } else {
         fontStyle.fontFamily = "'p1-v1', serif"; // Fallback to the default arabic font
     }
