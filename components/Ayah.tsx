@@ -49,9 +49,14 @@ const Ayah: React.FC<AyahProps> = ({ verse }) => {
 
     const verseNumberArabic = new Intl.NumberFormat('ar-EG').format(verse.verse_number);
 
+    const handleAyahClick = (e: React.MouseEvent) => {
+        e.stopPropagation(); // Prevent UI toggle
+        actions.selectAyah(verse);
+    }
+
     const renderVerseNumber = () => (
         <span 
-            onClick={() => actions.selectAyah(verse)}
+            onClick={handleAyahClick}
             className="inline-flex items-center justify-center w-7 h-7 rounded-full border-2 border-primary/20 text-primary font-ui mx-1 select-none text-sm cursor-pointer"
         >
             {verseNumberArabic}
@@ -63,7 +68,7 @@ const Ayah: React.FC<AyahProps> = ({ verse }) => {
              <span 
                 className={`ayah-container inline relative ${isPlaying ? 'bg-emerald-500/20 rounded-md' : ''} transition-colors duration-300`}
             >
-                <span onClick={() => actions.selectAyah(verse)} className="cursor-pointer">
+                <span onClick={handleAyahClick} className="cursor-pointer">
                     {state.glyphData[verse.verse_key].text}
                 </span>
                 {' '}

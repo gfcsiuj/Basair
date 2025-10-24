@@ -24,13 +24,6 @@ const SettingsPanel: React.FC = () => {
         { id: 'blue', name: 'أزرق', icon: 'fa-water', color: 'text-sky-500' },
     ];
     
-    const fonts: { id: Font; name: string }[] = [
-        { id: 'arabic', name: 'الخط العثماني' },
-        { id: 'qpc-v1', name: 'خط النسخ (QPC v1)' },
-        { id: 'indopak', name: 'هندي-باكستاني' },
-        { id: 'noto', name: 'نسخ' },
-    ];
-
     const settingCards = [
         {
             title: "المظهر",
@@ -51,12 +44,6 @@ const SettingsPanel: React.FC = () => {
             icon: "fa-font",
             content: (
                 <div className="space-y-4">
-                    <div>
-                         <label className="block text-sm mb-2 text-text-secondary">نوع الخط</label>
-                         <select value={state.font} onChange={(e) => actions.setFont(e.target.value as Font)} className="input w-full bg-bg-primary border-border focus:border-primary">
-                            {fonts.map(font => <option key={font.id} value={font.id}>{font.name}</option>)}
-                         </select>
-                    </div>
                     <div>
                         <label className="block text-sm mb-2 text-text-secondary">حجم الخط</label>
                          <div className="flex items-center gap-4">

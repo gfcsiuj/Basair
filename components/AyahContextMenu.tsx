@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../hooks/useApp';
 import { API_BASE, AUDIO_BASE } from '../constants';
-import { Panel, RepeatMode } from '../../types';
+import { Panel, RepeatMode } from '../types';
 
 const AyahContextMenu: React.FC = () => {
     const { state, actions } = useApp();
@@ -20,6 +20,31 @@ const AyahContextMenu: React.FC = () => {
     const onDismiss = () => {
         actions.selectAyah(null);
     };
+    
+    useEffect(() => {
+        const styleId = 'context-menu-font-style';
+        let styleEl = document.getElementById(styleId) as HTMLStyleElement;
+
+        if (isVisible && selectedAyah && state.font === 'qpc-v1') {
+            if (!styleEl) {
+                styleEl = document.createElement('style');
+                styleEl.id = styleId;
+                document.head.appendChild(styleEl);
+            }
+            const pageNumber = selectedAyah.page_number;
+            styleEl.innerHTML = `
+                @font-face {
+                    font-family: 'quran-font-p${pageNumber}';
+                    src: url('/ZPCV1Font/p${pageNumber}.ttf') format('truetype');
+                    font-display: block;
+                }
+            `;
+        }
+        return () => {
+            if (styleEl) styleEl.innerHTML = '';
+        }
+    }, [isVisible, selectedAyah, state.font]);
+
 
     const handleTouchStart = (e: React.TouchEvent) => {
         touchStartY.current = e.touches[0].clientY;
@@ -162,6 +187,16 @@ const AyahContextMenu: React.FC = () => {
         { icon: 'fa-font', label: 'مشاركة كنص', action: shareText },
         { icon: 'fa-image', label: 'مشاركة كصورة', action: shareAsImage },
     ];
+
+    const fontStyle: React.CSSProperties = {};
+    let ayahText = selectedAyah?.text_uthmani;
+
+    if (state.font === 'qpc-v1' && selectedAyah && state.glyphData && state.glyphData[selectedAyah.verse_key]) {
+        fontStyle.fontFamily = `'quran-font-p${selectedAyah.page_number}'`;
+        ayahText = state.glyphData[selectedAyah.verse_key].text;
+    } else {
+        fontStyle.fontFamily = "'p1-v1', serif"; // Fallback to the default arabic font
+    }
     
     const renderContent = () => {
         if (showShareOptions) {
@@ -207,7 +242,7 @@ const AyahContextMenu: React.FC = () => {
                         </button>
                     )}
                     <div className="mb-4 text-center">
-                        <p className="font-arabic text-lg mb-1">{selectedAyah?.text_uthmani}</p>
+                        <p className="text-lg mb-1" style={fontStyle}>{ayahText}</p>
                         <p className="text-sm text-text-secondary">{`سورة ${surah?.name_arabic} - الآية ${selectedAyah?.verse_number}`}</p>
                     </div>
                     {renderContent()}

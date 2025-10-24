@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../hooks/useApp';
+import { Font } from '../types';
 
 declare const html2canvas: any;
 
@@ -9,7 +10,7 @@ const ShareImageGenerator: React.FC = () => {
 
     const [config, setConfig] = useState({
         fontSize: 40,
-        fontFamily: 'arabic',
+        fontFamily: state.font,
         textColor: '#FFFFFF',
         bgColor: '#059669',
         bgImage: '',
@@ -25,8 +26,37 @@ const ShareImageGenerator: React.FC = () => {
     useEffect(() => {
         if (isVisible) {
             setIsRendered(true);
+            setConfig(c => ({ ...c, fontFamily: state.font })); // Sync font on open
         }
-    }, [isVisible]);
+    }, [isVisible, state.font]);
+    
+    useEffect(() => {
+        const styleId = 'share-image-font-style';
+        let styleEl = document.getElementById(styleId) as HTMLStyleElement;
+
+        if (isVisible && selectedAyah && config.fontFamily === 'qpc-v1') {
+            if (!styleEl) {
+                styleEl = document.createElement('style');
+                styleEl.id = styleId;
+                document.head.appendChild(styleEl);
+            }
+            const pageNumber = selectedAyah.page_number;
+            styleEl.innerHTML = `
+                @font-face {
+                    font-family: 'quran-font-p${pageNumber}';
+                    src: url('/ZPCV1Font/p${pageNumber}.ttf') format('truetype');
+                    font-display: block;
+                }
+            `;
+        }
+        
+        return () => {
+            if (styleEl) {
+                styleEl.innerHTML = '';
+            }
+        };
+    }, [isVisible, selectedAyah, config.fontFamily]);
+
 
     const handleAnimationEnd = () => {
         if (!isVisible) {
@@ -72,16 +102,6 @@ const ShareImageGenerator: React.FC = () => {
     
     const surah = selectedAyah ? state.surahs.find(s => s.id === selectedAyah.chapter_id) : null;
     
-    const fontClasses: { [key: string]: string } = {
-        'arabic': 'font-arabic',
-        'indopak': 'font-indopak',
-        'noto': 'font-noto'
-    };
-    const fonts = [
-        { id: 'arabic', name: 'عثماني' },
-        { id: 'indopak', name: 'هندي' },
-        { id: 'noto', name: 'نسخ' },
-    ];
     const textColors = ['#FFFFFF', '#000000', '#FBBF24', '#34D399', '#3B82F6'];
     const backgrounds = [
         { type: 'color', value: '#059669' },
@@ -92,6 +112,23 @@ const ShareImageGenerator: React.FC = () => {
         { type: 'gradient', value: 'linear-gradient(to top right, #059669, #34d399)' },
         { type: 'gradient', value: 'linear-gradient(to top right, #5b21b6, #a78bfa)' },
     ];
+    
+    const dynamicStyle: React.CSSProperties = {
+        backgroundColor: config.bgImage ? 'transparent' : config.bgColor,
+        backgroundImage: config.bgImage ? `url(${config.bgImage})` : (backgrounds.find(b => b.value === config.bgColor && b.type === 'gradient')?.value),
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        color: config.textColor,
+        fontSize: `${config.fontSize}px`,
+        lineHeight: 1.8,
+        padding: `${config.padding}px`
+    };
+
+    let ayahText = selectedAyah?.text_uthmani;
+    if (config.fontFamily === 'qpc-v1' && selectedAyah && state.glyphData && state.glyphData[selectedAyah.verse_key]) {
+        dynamicStyle.fontFamily = `'quran-font-p${selectedAyah.page_number}'`;
+        ayahText = state.glyphData[selectedAyah.verse_key].text;
+    }
 
 
     if (!isRendered) return null;
@@ -113,21 +150,12 @@ const ShareImageGenerator: React.FC = () => {
                 <main className="flex-1 p-4 flex items-center justify-center bg-bg-secondary overflow-hidden">
                     <div
                         ref={previewRef}
-                        className={`w-[400px] h-[400px] flex flex-col items-center justify-center text-center relative overflow-hidden shadow-lg ${fontClasses[config.fontFamily]}`}
-                        style={{ 
-                            backgroundColor: config.bgImage ? 'transparent' : config.bgColor, 
-                            backgroundImage: config.bgImage ? `url(${config.bgImage})` : (backgrounds.find(b => b.value === config.bgColor && b.type === 'gradient')?.value),
-                            backgroundSize: 'cover',
-                            backgroundPosition: 'center',
-                            color: config.textColor, 
-                            fontSize: `${config.fontSize}px`, 
-                            lineHeight: 1.8,
-                            padding: `${config.padding}px`
-                        }}
+                        className={`w-[400px] h-[400px] flex flex-col items-center justify-center text-center relative overflow-hidden shadow-lg`}
+                        style={dynamicStyle}
                     >
                          {config.bgImage && <div className="absolute inset-0 bg-black/30"></div>}
                         <div className="relative z-10">
-                            <p>{selectedAyah?.text_uthmani}</p>
+                            <p>{ayahText}</p>
                             {config.showInfo && (
                                  <p className="font-ui mt-4 opacity-80" style={{ fontSize: `${config.fontSize * 0.4}px` }}>
                                     {`{${surah?.name_arabic}: ${selectedAyah?.verse_number}}`}

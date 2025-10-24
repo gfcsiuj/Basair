@@ -32,7 +32,7 @@ export enum RepeatMode {
 }
 
 export type Theme = 'light' | 'dark' | 'sepia' | 'blue';
-export type Font = 'arabic' | 'indopak' | 'noto' | 'qpc-v1';
+export type Font = 'qpc-v1';
 
 export interface Surah {
     id: number;
@@ -222,6 +222,11 @@ export interface AppState {
     isReciterModalOpen: boolean;
     isRangeModalOpen: boolean;
     glyphData: { [key: string]: { text: string } } | null;
+    prayerTimes: { [key: string]: string; } | null;
+    locationName: string | null;
+    prayerTimesStatus: 'idle' | 'loading' | 'success' | 'error';
+    notificationPermission: NotificationPermission;
+    areNotificationsEnabled: boolean;
 }
 
 export type DownloadableItem = {
@@ -270,6 +275,8 @@ export interface AppActions {
     toggleVerseByVerseLayout: () => void;
     getPageData: (pageNumber: number) => Promise<Verse[] | null>;
     toggleFavoriteReciter: (id: number) => void;
+    loadPrayerTimes: () => Promise<void>;
+    toggleNotifications: () => Promise<void>;
 }
 
 export interface AppContextType {

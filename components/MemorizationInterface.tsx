@@ -466,7 +466,7 @@ const MemorizationInterface: React.FC = () => {
                 onTouchStart={handleTouchStart}
                 onTouchEnd={handleTouchEnd}
             >
-                 <div className={`font-arabic text-right`} style={{ fontSize: `${state.fontSize + 2}px`, lineHeight: 3 }}>
+                 <div className={`font-noto text-right`} style={{ fontSize: `${state.fontSize + 2}px`, lineHeight: 3 }}>
                     {[...(state.pageData.right || []), ...(state.pageData.left || [])].map(verse => (
                        <React.Fragment key={verse.verse_key}>
                            {verse.words.filter(w => w.char_type_name === 'word').map((word) => {

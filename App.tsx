@@ -1,5 +1,3 @@
-
-
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { GoogleGenAI } from "@google/genai";
 import { Surah, Verse, Reciter, Tafsir, Translation, Bookmark, Khatmah, AppState, AppContextType, Panel, Theme, Font, ReadingMode, AyahWordState, SearchResponse, Note, TasbeehCounter, Word, DownloadableItem, RepeatMode } from './types';
@@ -23,10 +21,11 @@ import TafsirPopup from './components/TafsirPopup';
 import ShareImageGenerator from './components/ShareImageGenerator';
 import Onboarding from './components/Onboarding';
 import WordPopup from './components/WordPopup';
+import { AppContext } from './context';
 
 
 // Create a context to provide state and actions to all components
-export const AppContext = React.createContext<AppContextType | null>(null);
+
 
 const customReciters: Reciter[] = [
     { id: 1001, reciter_name: 'أبو بكر الشاطري', style: 'The Quran Project' },
@@ -208,13 +207,14 @@ const App: React.FC = () => {
     const preloadAudioRef = useRef<HTMLAudioElement>(null);
     const isInitialMount = useRef(true);
     const downloadControllerRef = useRef<AbortController | null>(null);
+    const notificationTimers = useRef<number[]>([]);
 
     const [state, setState] = useState<AppState>({
         isInitialized: false,
         isFirstLaunch: !localStorage.getItem('hasLaunched'),
         currentPage: parseInt(localStorage.getItem('lastPage') || '1'),
         theme: (localStorage.getItem('theme') as Theme) || 'light',
-        font: (localStorage.getItem('font') as Font) || 'arabic',
+        font: 'qpc-v1',
         fontSize: parseInt(localStorage.getItem('fontSize') || '22'),
         readingMode: ReadingMode.Reading,
         surahs: [],
@@ -262,6 +262,11 @@ const App: React.FC = () => {
         isReciterModalOpen: false,
         isRangeModalOpen: false,
         glyphData: null,
+        prayerTimes: null,
+        locationName: null,
+        prayerTimesStatus: 'idle',
+        notificationPermission: 'default',
+        areNotificationsEnabled: JSON.parse(localStorage.getItem('areNotificationsEnabled') || 'false'),
     });
     
     // --- API & Data Loading ---
@@ -319,7 +324,8 @@ const App: React.FC = () => {
         const apiReciterId = state.selectedReciterId >= 1001 ? 7 : state.selectedReciterId;
         const tafsirId = state.selectedTafsirId;
         const translationId = state.selectedTranslationId;
-        const url = `${API_BASE}/verses/by_page/${pageNumber}?language=ar&words=true&word_fields=text_uthmani,translation&audio=${apiReciterId}&tafsirs=${tafsirId}&translations=${translationId}&fields=text_uthmani,chapter_id,juz_number,page_number,verse_key,verse_number,words,audio`;
+        const wordParams = state.font === 'qpc-v1' ? '' : '&words=true&word_fields=text_uthmani,translation';
+        const url = `${API_BASE}/verses/by_page/${pageNumber}?language=ar${wordParams}&audio=${apiReciterId}&tafsirs=${tafsirId}&translations=${translationId}&fields=text_uthmani,chapter_id,juz_number,page_number,verse_key,verse_number,words,audio`;
         const data = await fetchWithRetry<{ verses: Verse[] }>(url, 3, signal);
         
         // Manually inject the full audio URL for custom reciters
@@ -335,7 +341,7 @@ const App: React.FC = () => {
             }
             return verse;
         });
-    }, [fetchWithRetry, state.selectedReciterId, state.selectedTafsirId, state.selectedTranslationId, getAudioUrlForVerse]);
+    }, [fetchWithRetry, state.selectedReciterId, state.selectedTafsirId, state.selectedTranslationId, getAudioUrlForVerse, state.font]);
 
     const loadPage = useCallback(async (pageNumber: number) => {
         if (pageNumber < 1 || pageNumber > TOTAL_PAGES) return;
@@ -544,11 +550,101 @@ const App: React.FC = () => {
         });
     }, []);
 
+    const loadPrayerTimes = useCallback(async () => {
+        setState(s => ({ ...s, prayerTimesStatus: 'loading' }));
+    
+        const onLocationSuccess = async (position: GeolocationPosition) => {
+            const { latitude, longitude } = position.coords;
+    
+            try {
+                const cityResponse = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=ar`);
+                const cityData = await cityResponse.json();
+                const locationName = cityData.city || cityData.locality || 'موقع غير معروف';
+                setState(s => ({...s, locationName}));
+            } catch (e) {
+                console.error("Failed to fetch city name", e);
+                setState(s => ({...s, locationName: 'موقع غير معروف'}));
+            }
+            
+            const date = new Date();
+            const year = date.getFullYear();
+            const month = (date.getMonth() + 1).toString().padStart(2, '0');
+            const day = date.getDate().toString().padStart(2, '0');
+            const formattedDate = `${day}-${month}-${year}`;
+            const method = 5; 
+    
+            try {
+                const prayerTimesUrl = `https://api.aladhan.com/v1/timings/${formattedDate}?latitude=${latitude}&longitude=${longitude}&method=${method}`;
+                const response = await fetchWithRetry<{ code: number; data: { timings: { [key: string]: string } } }>(prayerTimesUrl);
+    
+                if (response.code === 200) {
+                    setState(s => ({
+                        ...s,
+                        prayerTimes: response.data.timings,
+                        prayerTimesStatus: 'success',
+                    }));
+                } else {
+                    throw new Error('API returned non-200 code');
+                }
+            } catch (error) {
+                console.error('Error fetching prayer times:', error);
+                setState(s => ({ ...s, prayerTimesStatus: 'error' }));
+            }
+        };
+    
+        const onLocationError = (error: GeolocationPositionError) => {
+            console.error("Error getting location:", error.message);
+            setState(s => ({ ...s, prayerTimesStatus: 'error' }));
+        };
+    
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(onLocationSuccess, onLocationError);
+        } else {
+            setState(s => ({ ...s, prayerTimesStatus: 'error' }));
+        }
+    }, [fetchWithRetry]);
+
+    const toggleNotifications = useCallback(async () => {
+        let currentPermission = state.notificationPermission;
+    
+        if (!('Notification' in window)) {
+            alert('هذا المتصفح لا يدعم الإشعارات.');
+            return;
+        }
+    
+        if (currentPermission === 'default') {
+            currentPermission = await Notification.requestPermission();
+            setState(s => ({ ...s, notificationPermission: currentPermission }));
+        }
+    
+        if (currentPermission === 'denied') {
+            alert('تم رفض إذن الإشعارات. يرجى تفعيلها من إعدادات المتصفح.');
+            return;
+        }
+    
+        if (currentPermission === 'granted') {
+            setState(s => {
+                const newIsEnabled = !s.areNotificationsEnabled;
+                localStorage.setItem('areNotificationsEnabled', JSON.stringify(newIsEnabled));
+                if (newIsEnabled) {
+                     alert('تم تفعيل إشعارات الصلاة.');
+                } else {
+                     alert('تم إيقاف إشعارات الصلاة.');
+                }
+                return { ...s, areNotificationsEnabled: newIsEnabled };
+            });
+        }
+    }, [state.notificationPermission]);
+
     useEffect(() => {
         const initializeApp = async () => {
             try {
                 const aiInstance = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
                 
+                if ('Notification' in window) {
+                    setState(s => ({ ...s, notificationPermission: Notification.permission }));
+                }
+
                 await offlineManager.openDB();
                 const quranTextStatus = await offlineManager.isQuranTextDownloaded();
                 const recitersStatus = await offlineManager.getDownloadedReciters();
@@ -605,6 +701,57 @@ const App: React.FC = () => {
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [state.selectedReciterId, state.selectedTafsirId, state.selectedTranslationId]);
+
+    // Effect for prayer time notifications
+    useEffect(() => {
+        notificationTimers.current.forEach(clearTimeout);
+        notificationTimers.current = [];
+    
+        if (state.areNotificationsEnabled && state.prayerTimes && state.notificationPermission === 'granted') {
+            const now = new Date();
+            const prayerNames: { [key: string]: string } = {
+                Fajr: 'الفجر',
+                Sunrise: 'الشروق',
+                Dhuhr: 'الظهر',
+                Asr: 'العصر',
+                Maghrib: 'المغرب',
+                Isha: 'العشاء',
+            };
+    
+            Object.entries(state.prayerTimes).forEach(([key, time]) => {
+                const prayerName = prayerNames[key];
+                if (prayerName && time) {
+                    const [hours, minutes] = (time as string).split(':').map(Number);
+                    const prayerDate = new Date();
+                    prayerDate.setHours(hours, minutes, 0, 0);
+    
+                    if (prayerDate <= now) {
+                        prayerDate.setDate(prayerDate.getDate() + 1);
+                    }
+    
+                    const timeout = prayerDate.getTime() - now.getTime();
+                    if (timeout > 0) {
+                         const timerId = setTimeout(() => {
+                            try {
+                                 new Notification(`حان الآن موعد أذان ${prayerName}`, {
+                                    body: `حسب التوقيت المحلي لمدينة ${state.locationName || 'موقعك'}.`,
+                                    icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23059669;stop-opacity:1' /%3E%3Cstop offset='100%25' style='stop-color:%2310b981;stop-opacity:1' /%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' fill='url(%23grad)' rx='20'/%3E%3Ctext x='50' y='50' text-anchor='middle' dy='.3em' fill='white' font-size='45' font-family='Arial' font-weight='bold'%3E%D8%A8%3C/text%3E%3C/svg%3E",
+                                    tag: 'basaier-prayer-time'
+                                });
+                            } catch (e) {
+                                console.error("Notification Error:", e);
+                            }
+                        }, timeout);
+                        notificationTimers.current.push(timerId as unknown as number);
+                    }
+                }
+            });
+        }
+    
+        return () => {
+            notificationTimers.current.forEach(clearTimeout);
+        };
+    }, [state.prayerTimes, state.areNotificationsEnabled, state.notificationPermission, state.locationName]);
 
     // --- State Management Actions ---
     const setTheme = useCallback((theme: Theme) => {
@@ -878,12 +1025,14 @@ const App: React.FC = () => {
             setPlaybackRate, addMemorizationPoints,
             startDownload, deleteDownloadedContent, setRepeatMode, toggleVerseByVerseLayout,
             getPageData, toggleFavoriteReciter,
+            loadPrayerTimes,
+            toggleNotifications,
         }
     }), [state, loadPage, setTheme, setFont, setFontSize, openPanel, setReadingMode, selectAyah, togglePlayPause, playNext, playPrev,
         playRange, toggleBookmark, addKhatmah, updateKhatmahProgress, deleteKhatmah, addNote, updateNote, deleteNote, addTasbeehCounter,
         updateTasbeehCounter, updateTasbeehCounterDetails, deleteTasbeehCounter, resetTasbeehCounter, resetAllTasbeehCounters, setReciter,
         setTafsir, setTranslation, fetchWithRetry, recordUserActivity, toggleUIVisibility, selectWord, setPlaybackRate,
-        addMemorizationPoints, startDownload, deleteDownloadedContent, setRepeatMode, toggleVerseByVerseLayout, getPageData, toggleFavoriteReciter]);
+        addMemorizationPoints, startDownload, deleteDownloadedContent, setRepeatMode, toggleVerseByVerseLayout, getPageData, toggleFavoriteReciter, loadPrayerTimes, toggleNotifications]);
     
     useEffect(() => {
         document.documentElement.setAttribute('data-theme', state.theme);

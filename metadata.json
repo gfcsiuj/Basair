@@ -1,7 +1,8 @@
 {
-  "name": "بصائر - القرآن ",
+  "name": "مشروع بصائر ",
   "description": "تطبيق قرآني متكامل مع التفسير والترجمة والاستماع للقراء المختلفين ووضع التحفيظ الذكي بالصوت.",
   "requestFramePermissions": [
-    "microphone"
+    "microphone",
+    "geolocation"
   ]
 }

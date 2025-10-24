@@ -52,7 +52,7 @@ const MainReadingInterface: React.FC = () => {
             const cssRules = pagesToLoad.map(page => `
                 @font-face {
                     font-family: 'quran-font-p${page}';
-                    src: url('ZPCV1Font/p${page}.ttf') format('truetype');
+                    src: url('/ZPCV1Font/p${page}.ttf') format('truetype');
                     font-display: swap;
                 }
             `).join('\n');
@@ -201,7 +201,7 @@ const MainReadingInterface: React.FC = () => {
                 onScroll={actions.recordUserActivity}
                 onClick={(e) => {
                     // Prevent UI toggle if the click target is interactive
-                    if ((e.target as HTMLElement).closest('button, a, input, select, .word, .verse-number')) {
+                    if ((e.target as HTMLElement).closest('button, a, input, select, .word, .verse-number, .ayah-container span')) {
                         return;
                     }
                     actions.toggleUIVisibility();
