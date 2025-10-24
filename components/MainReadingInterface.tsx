@@ -4,6 +4,7 @@ import QuranPage from './QuranPage';
 import BottomNav from './BottomNav';
 import { useApp } from '../hooks/useApp';
 import { TOTAL_PAGES } from '../constants';
+import DesktopBookLayout from './DesktopBookLayout';
 import { Panel } from '../types';
 
 const MainReadingInterface: React.FC = () => {
@@ -14,6 +15,20 @@ const MainReadingInterface: React.FC = () => {
     const initialPinchDistance = useRef(0);
     const lastFontSize = useRef(state.fontSize);
     const gestureState = useRef<'none' | 'swipe' | 'pinch'>('none');
+    
+    const [isDesktopView, setIsDesktopView] = useState(window.innerWidth > 1024);
+
+    useEffect(() => {
+        const mediaQuery = window.matchMedia('(min-width: 1025px)');
+        const handleResize = (e: MediaQueryListEvent) => {
+            setIsDesktopView(e.matches);
+            // Reload page with new layout context
+            actions.loadPage(state.currentPage);
+        };
+        mediaQuery.addEventListener('change', handleResize);
+        
+        return () => mediaQuery.removeEventListener('change', handleResize);
+    }, [actions, state.currentPage]);
     
     useEffect(() => {
         const styleId = 'dynamic-quran-font-style';
@@ -30,7 +45,7 @@ const MainReadingInterface: React.FC = () => {
             const cssRule = `
                 @font-face {
                     font-family: 'quran-font-p${page}';
-                    src: url('/ZPCV1Font/p${page}.ttf') format('truetype');
+                    src: url('/QPC V2 Font/p${page}.ttf') format('truetype');
                     font-display: swap;
                 }
             `;
@@ -96,7 +111,7 @@ const MainReadingInterface: React.FC = () => {
             if (state.selectedAyah || state.selectedWord) return;
 
             if (Math.abs(diffX) > 50 && diffY < 100) { // Horizontal swipe
-                const pageIncrement = 1;
+                const pageIncrement = isDesktopView ? 2 : 1;
                 if (diffX > 0 && state.currentPage > 1) { // Swipe right (previous page)
                     const newPage = Math.max(1, state.currentPage - pageIncrement);
                     actions.loadPage(newPage);
@@ -124,7 +139,7 @@ const MainReadingInterface: React.FC = () => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (state.activePanel || state.selectedAyah || state.selectedWord) return;
 
-            const pageIncrement = 1;
+            const pageIncrement = isDesktopView ? 2 : 1;
             
             if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
                 actions.recordUserActivity();
@@ -140,9 +155,12 @@ const MainReadingInterface: React.FC = () => {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [actions, state.currentPage, state.activePanel, state.selectedAyah, state.selectedWord]);
+    }, [actions, state.currentPage, state.activePanel, state.selectedAyah, state.selectedWord, isDesktopView]);
 
     const renderContent = () => {
+        if (isDesktopView) {
+            return <DesktopBookLayout />;
+        }
         return (
             <div className="w-full min-h-full flex items-start justify-center px-4 pb-4 md:px-8 md:pb-8" data-main-bg>
                 <QuranPage key={state.currentPage} pageVerses={state.pageData.right} />
@@ -151,13 +169,13 @@ const MainReadingInterface: React.FC = () => {
     };
 
     // Define heights for padding calculation
-    const isAudioOpen = state.activePanel === Panel.Audio;
+    const isAudioOpen = !isDesktopView && state.activePanel === Panel.Audio;
     const headerVisibleHeight = `calc(4.5rem + env(safe-area-inset-top, 0rem))`;
-    const bottomNavVisibleHeight = `calc(${isAudioOpen ? '13rem' : '4.5rem'} + env(safe-area-inset-bottom, 0rem))`;
+    const bottomNavVisibleHeight = isDesktopView ? '0rem' : `calc(${isAudioOpen ? '13rem' : '4.5rem'} + env(safe-area-inset-bottom, 0rem))`;
     
     // When UI is hidden, padding should only account for safe areas to prevent content from going under notches.
     const headerHiddenHeight = `env(safe-area-inset-top, 0rem)`;
-    const bottomNavHiddenHeight = `env(safe-area-inset-bottom, 0rem)`;
+    const bottomNavHiddenHeight = isDesktopView ? '0rem' : `env(safe-area-inset-bottom, 0rem)`;
 
     return (
         <div className="h-full w-full">
@@ -175,7 +193,7 @@ const MainReadingInterface: React.FC = () => {
                 onTouchEnd={handleTouchEnd}
                 onScroll={actions.recordUserActivity}
                 onClick={(e) => {
-                    // Prevent UI toggle if the click target is an explicit interactive element like a button.
+                    // Prevent UI toggle if the click target is an explicit interactive element.
                     if ((e.target as HTMLElement).closest('button, a, input, select')) {
                         return;
                     }
@@ -184,7 +202,7 @@ const MainReadingInterface: React.FC = () => {
             >
                 {renderContent()}
             </main>
-            <BottomNav />
+            {!isDesktopView && <BottomNav />}
         </div>
     );
 };

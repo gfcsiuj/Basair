@@ -221,7 +221,7 @@ export interface AppState {
     favoriteReciters: number[];
     isReciterModalOpen: boolean;
     isRangeModalOpen: boolean;
-    glyphData: { [key: string]: { text: string } } | null;
+    wordGlyphData: { [key: string]: { text: string } } | null;
     prayerTimes: { [key: string]: string; } | null;
     locationName: string | null;
     prayerTimesStatus: 'idle' | 'loading' | 'success' | 'error';

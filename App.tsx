@@ -262,7 +262,7 @@ const App: React.FC = () => {
         favoriteReciters: JSON.parse(localStorage.getItem('favoriteReciters') || '[]'),
         isReciterModalOpen: false,
         isRangeModalOpen: false,
-        glyphData: null,
+        wordGlyphData: null,
         prayerTimes: null,
         locationName: null,
         prayerTimesStatus: 'idle',
@@ -617,12 +617,12 @@ const App: React.FC = () => {
                 const quranTextStatus = await offlineManager.isQuranTextDownloaded();
                 const recitersStatus = await offlineManager.getDownloadedReciters();
 
-                const [chaptersData, recitationsData, tafsirsData, translationsData, glyphData] = await Promise.all([
+                const [chaptersData, recitationsData, tafsirsData, translationsData, wordGlyphData] = await Promise.all([
                     fetchWithRetry<{ chapters: Surah[] }>(`${API_BASE}/chapters?language=ar`),
                     fetchWithRetry<{ recitations: Reciter[] }>(`${API_BASE}/resources/recitations?language=ar`),
                     fetchWithRetry<{ tafsirs: Tafsir[] }>(`${API_BASE}/resources/tafsirs?language=ar`),
                     fetchWithRetry<{ translations: Translation[] }>(`${API_BASE}/resources/translations?language=ar`),
-                    fetch('/qpc-v1-ayah-by-ayah-glyphs.json').then(res => res.json())
+                    fetch('/qpc-v4.json').then(res => res.json())
                 ]);
 
                 const processedApiReciters = recitationsData.recitations.map(reciter => ({
@@ -643,7 +643,7 @@ const App: React.FC = () => {
                     translations: translationsData.translations,
                     ai: aiInstance,
                     offlineStatus: { ...s.offlineStatus, quranText: quranTextStatus, reciters: recitersStatus },
-                    glyphData: glyphData,
+                    wordGlyphData: wordGlyphData,
                 }));
                 await loadPage(state.currentPage);
                 

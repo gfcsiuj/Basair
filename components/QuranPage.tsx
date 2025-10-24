@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useApp } from '../hooks/useApp';
 import Ayah from './Ayah';
 import { Verse } from '../types';
@@ -8,7 +8,26 @@ const QuranPage: React.FC<{
     pageVerses: Verse[] | null;
 }> = ({ pageVerses }) => {
     const { state } = useApp();
-    const { isLoading, error, font, fontSize, isVerseByVerseLayout, surahs } = state;
+    const { isLoading, error, font, fontSize, isVerseByVerseLayout, surahs, wordGlyphData } = state;
+
+    const processedVerses = useMemo(() => {
+        if (!pageVerses) return [];
+        // Only process for the qpc-v1 font, otherwise return original verses
+        if (font !== 'qpc-v1' || !wordGlyphData) {
+            return pageVerses.map(v => ({...v, glyphText: ''}));
+        };
+
+        return pageVerses.map(verse => {
+            const verseKeyPrefix = `${verse.chapter_id}:${verse.verse_number}:`;
+            const verseGlyphText = Object.entries(wordGlyphData)
+                .filter(([key]) => key.startsWith(verseKeyPrefix))
+                .map(([key, wordInfo]) => ({ ...wordInfo, wordNum: parseInt(key.split(':')[2], 10) }))
+                .sort((a, b) => a.wordNum - b.wordNum)
+                .map(wordInfo => (wordInfo as any).text)
+                .join('');
+            return { ...verse, glyphText: verseGlyphText };
+        });
+    }, [pageVerses, wordGlyphData, font]);
 
     if (isLoading && !pageVerses) { // Show loading skeleton only if there's no data yet
         return (
@@ -24,12 +43,12 @@ const QuranPage: React.FC<{
         return <div className="p-6 text-center text-red-500">{error}</div>;
     }
 
-    if (!pageVerses || pageVerses.length === 0) {
+    if (!processedVerses || processedVerses.length === 0) {
         return null;
     }
 
-    const pageNumber = pageVerses[0].page_number;
-    const juzNumber = pageVerses[0].juz_number;
+    const pageNumber = processedVerses[0].page_number;
+    const juzNumber = processedVerses[0].juz_number;
     
     const paddedJuz = String(juzNumber).padStart(3, '0');
     const juzLigature = `juz${paddedJuz}`;
@@ -54,8 +73,8 @@ const QuranPage: React.FC<{
 
     const PageJuzHeader = () => (
          <div className="flex justify-between items-center text-lg mb-4 text-primary px-2" style={{fontFamily: 'quran-common', fontFeatureSettings: '"calt", "liga"' }}>
-            <span>{juzNameLigature}</span>
             <span>{juzLigature}</span>
+            <span>{juzNameLigature}</span>
         </div>
     );
 
@@ -64,7 +83,7 @@ const QuranPage: React.FC<{
         return (
             <div className={`w-full max-w-2xl animate-pageTransition ${fontClassName}`} style={pageStyle}>
                 <PageJuzHeader />
-                {pageVerses.map(verse => {
+                {processedVerses.map(verse => {
                     let headerContent = null;
                     if (verse.verse_number === 1) {
                         const surah = surahs.find(s => s.id === verse.chapter_id);
@@ -101,7 +120,7 @@ const QuranPage: React.FC<{
               className={`text-right ${fontClassName}`}
               style={pageStyle}
             >
-                {pageVerses.map(verse => {
+                {processedVerses.map(verse => {
                     let headerContent = null;
                     if (verse.verse_number === 1) {
                         const surah = state.surahs.find(s => s.id === verse.chapter_id);

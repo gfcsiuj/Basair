@@ -35,7 +35,7 @@ const AyahContextMenu: React.FC = () => {
             styleEl.innerHTML = `
                 @font-face {
                     font-family: 'quran-font-p${pageNumber}';
-                    src: url('/ZPCV1Font/p${pageNumber}.ttf') format('truetype');
+                    src: url('/QPC V2 Font/p${pageNumber}.ttf') format('truetype');
                     font-display: block;
                 }
             `;
@@ -191,9 +191,15 @@ const AyahContextMenu: React.FC = () => {
     const fontStyle: React.CSSProperties = {};
     let ayahText = selectedAyah?.text_uthmani;
 
-    if (state.font === 'qpc-v1' && selectedAyah && state.glyphData && state.glyphData[selectedAyah.verse_key]) {
+    if (state.font === 'qpc-v1' && selectedAyah && state.wordGlyphData) {
         fontStyle.fontFamily = `'quran-font-p${selectedAyah.page_number}'`;
-        ayahText = state.glyphData[selectedAyah.verse_key].text;
+        const verseKeyPrefix = `${selectedAyah.chapter_id}:${selectedAyah.verse_number}:`;
+        ayahText = Object.entries(state.wordGlyphData)
+            .filter(([key]) => key.startsWith(verseKeyPrefix))
+            .map(([key, wordInfo]) => ({ ...wordInfo, wordNum: parseInt(key.split(':')[2], 10) }))
+            .sort((a, b) => a.wordNum - b.wordNum)
+            .map(wordInfo => (wordInfo as any).text)
+            .join('');
     }
     
     const renderContent = () => {

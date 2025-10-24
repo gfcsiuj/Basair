@@ -3,7 +3,7 @@ import { Verse, Word } from '../types';
 import { useApp } from '../hooks/useApp';
 
 interface AyahProps {
-    verse: Verse;
+    verse: Verse & { glyphText?: string };
 }
 
 const Ayah: React.FC<AyahProps> = ({ verse }) => {
@@ -82,7 +82,7 @@ const Ayah: React.FC<AyahProps> = ({ verse }) => {
     // For qpc font, the font itself includes the verse number symbol.
     // The entire ayah text becomes the interactive element.
     if (font === 'qpc-v1') {
-        const text = state.glyphData?.[verse.verse_key]?.text ?? verse.text_uthmani;
+        const text = verse.glyphText ?? verse.text_uthmani;
         return (
              <span 
                 {...ayahEventHandlers}
