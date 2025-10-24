@@ -21,6 +21,7 @@ import TafsirPopup from './components/TafsirPopup';
 import ShareImageGenerator from './components/ShareImageGenerator';
 import Onboarding from './components/Onboarding';
 import WordPopup from './components/WordPopup';
+import AyahContextMenu from './components/AyahContextMenu';
 import { AppContext } from './context';
 
 
@@ -1174,6 +1175,7 @@ const App: React.FC = () => {
                 {/* Popups / Modals */}
                 <TafsirPopup />
                 <WordPopup />
+                <AyahContextMenu />
                 <ShareImageGenerator />
                 {state.isReciterModalOpen && <ReciterSelectionModal onClose={() => setState(s => ({...s, isReciterModalOpen: false}))} />}
                 {state.isRangeModalOpen && <RangeSelectionModal onClose={() => setState(s => ({...s, isRangeModalOpen: false}))} />}

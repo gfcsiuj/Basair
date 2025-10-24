@@ -194,8 +194,6 @@ const AyahContextMenu: React.FC = () => {
     if (state.font === 'qpc-v1' && selectedAyah && state.glyphData && state.glyphData[selectedAyah.verse_key]) {
         fontStyle.fontFamily = `'quran-font-p${selectedAyah.page_number}'`;
         ayahText = state.glyphData[selectedAyah.verse_key].text;
-    } else {
-        fontStyle.fontFamily = "'p1-v1', serif"; // Fallback to the default arabic font
     }
     
     const renderContent = () => {
@@ -242,7 +240,7 @@ const AyahContextMenu: React.FC = () => {
                         </button>
                     )}
                     <div className="mb-4 text-center">
-                        <p className="text-lg mb-1" style={fontStyle}>{ayahText}</p>
+                        <p className="font-arabic text-lg mb-1" style={fontStyle}>{ayahText}</p>
                         <p className="text-sm text-text-secondary">{`سورة ${surah?.name_arabic} - الآية ${selectedAyah?.verse_number}`}</p>
                     </div>
                     {renderContent()}

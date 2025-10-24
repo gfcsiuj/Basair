@@ -97,12 +97,12 @@ const Ayah: React.FC<AyahProps> = ({ verse }) => {
     return (
         <span 
             {...ayahEventHandlers}
-            className={`ayah-container inline relative ${isPlaying ? 'bg-emerald-500/20 rounded-md' : ''} transition-colors duration-300`}
+            className={`ayah-container inline relative cursor-pointer ${isPlaying ? 'bg-emerald-500/20 rounded-md' : ''} transition-colors duration-300`}
         >
             {verse.words.filter(word => word.char_type_name === 'word').map(word => (
                  <React.Fragment key={word.id}>
                     <span 
-                        className="word hover:text-primary transition-colors cursor-pointer"
+                        className="word hover:text-primary transition-colors"
                         onMouseDown={(e) => handlePressStart(e, word)}
                         onMouseUp={handlePressEnd}
                         onMouseLeave={handlePressEnd}
@@ -119,7 +119,7 @@ const Ayah: React.FC<AyahProps> = ({ verse }) => {
             ))}
             
             <span 
-                className="inline-flex items-center justify-center w-7 h-7 rounded-full border-2 border-primary/20 text-primary font-ui mx-1 select-none text-sm cursor-pointer"
+                className="inline-flex items-center justify-center w-7 h-7 rounded-full border-2 border-primary/20 text-primary font-ui mx-1 select-none text-sm"
             >
                 {verseNumberArabic}
             </span>

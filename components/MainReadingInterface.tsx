@@ -175,8 +175,8 @@ const MainReadingInterface: React.FC = () => {
                 onTouchEnd={handleTouchEnd}
                 onScroll={actions.recordUserActivity}
                 onClick={(e) => {
-                    // Prevent UI toggle if the click target is interactive
-                    if ((e.target as HTMLElement).closest('button, a, input, select, .word, .ayah-container')) {
+                    // Prevent UI toggle if the click target is an explicit interactive element like a button.
+                    if ((e.target as HTMLElement).closest('button, a, input, select')) {
                         return;
                     }
                     actions.toggleUIVisibility();

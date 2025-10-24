@@ -3,7 +3,7 @@ import Header from './Header';
 import QuranPage from './QuranPage';
 import BottomNav from './BottomNav';
 import { useApp } from '../hooks/useApp';
-import { TOTAL_PAGES } from '../constants';
+import { TOTAL_PAGES } from './constants';
 import DesktopBookLayout from './DesktopBookLayout';
 import { Panel } from '../types';
 
@@ -163,8 +163,8 @@ const MainReadingInterface: React.FC = () => {
                 onTouchEnd={handleTouchEnd}
                 onScroll={actions.recordUserActivity}
                 onClick={(e) => {
-                    // Prevent UI toggle if the click target is interactive
-                    if ((e.target as HTMLElement).closest('button, a, input, select, .word, .verse-number')) {
+                    // Prevent UI toggle if the click target is an explicit interactive element.
+                    if ((e.target as HTMLElement).closest('button, a, input, select')) {
                         return;
                     }
                     actions.toggleUIVisibility();
