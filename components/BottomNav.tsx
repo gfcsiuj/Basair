@@ -43,14 +43,13 @@ const BottomNav: React.FC = () => {
         <nav 
             className={`fixed bottom-0 left-0 right-0 z-40 bg-bg-primary border-t border-border shadow-md transition-all duration-300 ease-in-out ${state.isUIVisible ? 'translate-y-0' : 'translate-y-full'}`}
             style={{ 
-                paddingBottom: 'env(safe-area-inset-bottom, 0rem)',
-                height: isAudioOpen ? '13rem' : 'auto' // Adjust height for audio controls
+                height: isAudioOpen ? `calc(13rem + env(safe-area-inset-bottom, 0rem))` : 'auto'
             }}
         >
             {isAudioOpen ? (
                 <AudioControlBar />
             ) : (
-                 <div className="grid grid-cols-5 max-w-lg mx-auto">
+                 <div className="grid grid-cols-5 max-w-lg mx-auto" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0rem)' }}>
                     <NavItem icon="fa-home" label="الرئيسية" panel={Panel.Dashboard} isActive={state.activePanel === Panel.Dashboard} onClick={() => handleNavClick(Panel.Dashboard)} />
                     <NavItem icon="fa-headphones-alt" label="الصوت" panel={Panel.Audio} isActive={isAudioOpen} onClick={() => handleNavClick(Panel.Audio)} />
                     <NavItem icon="fa-brain" label="الحفظ" panel="memorize" isActive={state.readingMode === ReadingMode.Memorization} onClick={() => handleNavClick('memorize')} />

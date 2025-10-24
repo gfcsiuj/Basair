@@ -285,7 +285,7 @@ const AIAssistant: React.FC = () => {
 
     const isAudioPanelOpen = activePanel === Panel.Audio;
     const fabBottomPosition = isAudioPanelOpen
-        ? 'calc(13rem + env(safe-area-inset-bottom, 0rem))'
+        ? 'calc(13rem + 0.5rem + env(safe-area-inset-bottom, 0rem))'
         : 'calc(5rem + env(safe-area-inset-bottom, 0rem))';
 
 

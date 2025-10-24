@@ -31,6 +31,8 @@ const QuranPage: React.FC<QuranPageProps> = ({ pageVerses }) => {
     }
 
     const pageNumber = pageVerses[0].page_number;
+    const juzNumber = pageVerses[0].juz_number;
+    const juzIdPadded = String(juzNumber).padStart(3, '0');
 
     const pageStyle: React.CSSProperties = {
         fontSize: `${fontSize}px`,
@@ -48,10 +50,18 @@ const QuranPage: React.FC<QuranPageProps> = ({ pageVerses }) => {
         }[font] || '';
     }
 
+    const PageJuzHeader = () => (
+        <div className="flex justify-between items-center text-lg mb-4 text-primary px-2" style={{ fontFamily: 'quran-common', fontFeatureSettings: '"ss01", "ss02"' }}>
+            <span>{`juz${juzIdPadded}`}</span>
+            <span>{`j${juzIdPadded}`}</span>
+        </div>
+    );
+
     // New Verse-by-Verse Layout
     if (isVerseByVerseLayout) {
         return (
             <div className={`w-full max-w-2xl animate-pageTransition ${fontClassName}`} style={pageStyle}>
+                <PageJuzHeader />
                 {pageVerses.map(verse => {
                     let headerContent = null;
                     if (verse.verse_number === 1) {
@@ -84,6 +94,7 @@ const QuranPage: React.FC<QuranPageProps> = ({ pageVerses }) => {
     // Original Page Layout
     return (
         <div className="w-full animate-pageTransition overflow-y-auto custom-scrollbar">
+            <PageJuzHeader />
             <div 
               className={`text-right ${fontClassName}`}
               style={pageStyle}

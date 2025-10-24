@@ -51,7 +51,10 @@ const AudioControlBar: React.FC = () => {
     };
 
     return (
-        <div className="w-full h-full flex flex-col px-4 pt-2 pb-2 justify-around text-text-primary">
+        <div 
+            className="w-full h-full flex flex-col px-4 pt-2 justify-around text-text-primary"
+            style={{ paddingBottom: `calc(0.5rem + env(safe-area-inset-bottom, 0rem))` }}
+        >
             <div className="w-full text-center" onClick={() => actions.openPanel(null)}>
                 <div className="w-12 h-1.5 bg-bg-tertiary rounded-full mx-auto cursor-pointer"></div>
             </div>
