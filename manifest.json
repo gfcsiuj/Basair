@@ -1,0 +1,22 @@
+{
+  "name": "مشروع بصائر",
+  "short_name": "بصائر",
+  "description": "تطبيق قرآني متكامل مع التفسير والترجمة والاستماع للقراء المختلفين ووضع التحفيظ الذكي بالصوت.",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#059669",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "maskable_icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

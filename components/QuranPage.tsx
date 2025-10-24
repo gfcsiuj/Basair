@@ -34,7 +34,7 @@ const QuranPage: React.FC<QuranPageProps> = ({ pageVerses }) => {
 
     const pageStyle: React.CSSProperties = {
         fontSize: `${fontSize}px`,
-        lineHeight: 2.8
+        lineHeight: 2.2
     };
     let fontClassName = '';
 
@@ -66,7 +66,7 @@ const QuranPage: React.FC<QuranPageProps> = ({ pageVerses }) => {
                     return (
                         <div key={verse.verse_key} className="mb-8 py-4 border-b border-border last:border-b-0">
                             {headerContent}
-                            <div className="text-right leading-loose" style={{ lineHeight: 2.8 }}>
+                            <div className="text-right" style={{ lineHeight: 2.3 }}>
                                 <Ayah verse={verse} />
                             </div>
                             <div className="mt-4 pr-4 border-r-2 border-primary/50">
@@ -85,7 +85,7 @@ const QuranPage: React.FC<QuranPageProps> = ({ pageVerses }) => {
     return (
         <div className="w-full animate-pageTransition overflow-y-auto custom-scrollbar">
             <div 
-              className={`text-right text-justify leading-loose ${fontClassName}`}
+              className={`text-right ${fontClassName}`}
               style={pageStyle}
             >
                 {pageVerses.map(verse => {
@@ -99,7 +99,7 @@ const QuranPage: React.FC<QuranPageProps> = ({ pageVerses }) => {
                     return (
                         <React.Fragment key={verse.verse_key}>
                             {headerContent}
-                            <Ayah verse={verse} />
+                            <Ayah verse={verse} />{' '}
                         </React.Fragment>
                     );
                 })}
