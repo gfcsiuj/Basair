@@ -4,11 +4,9 @@ import Ayah from './Ayah';
 import { Verse } from '../types';
 import SurahHeader from './SurahHeader';
 
-interface QuranPageProps {
+const QuranPage: React.FC<{
     pageVerses: Verse[] | null;
-}
-
-const QuranPage: React.FC<QuranPageProps> = ({ pageVerses }) => {
+}> = ({ pageVerses }) => {
     const { state } = useApp();
     const { isLoading, error, font, fontSize, isVerseByVerseLayout, surahs } = state;
 
@@ -32,7 +30,11 @@ const QuranPage: React.FC<QuranPageProps> = ({ pageVerses }) => {
 
     const pageNumber = pageVerses[0].page_number;
     const juzNumber = pageVerses[0].juz_number;
-    const juzIdPadded = String(juzNumber).padStart(3, '0');
+    
+    const paddedJuz = String(juzNumber).padStart(3, '0');
+    const juzLigature = `juz${paddedJuz}`;
+    const juzNameLigature = `j${paddedJuz}`;
+
 
     const pageStyle: React.CSSProperties = {
         fontSize: `${fontSize}px`,
@@ -51,9 +53,9 @@ const QuranPage: React.FC<QuranPageProps> = ({ pageVerses }) => {
     }
 
     const PageJuzHeader = () => (
-        <div className="flex justify-between items-center text-lg mb-4 text-primary px-2" style={{ fontFamily: 'quran-common', fontFeatureSettings: '"ss01", "ss02"' }}>
-            <span>{`juz${juzIdPadded}`}</span>
-            <span>{`j${juzIdPadded}`}</span>
+         <div className="flex justify-between items-center text-lg mb-4 text-primary px-2" style={{fontFamily: 'quran-common', fontFeatureSettings: '"calt", "liga"' }}>
+            <span>{juzNameLigature}</span>
+            <span>{juzLigature}</span>
         </div>
     );
 
