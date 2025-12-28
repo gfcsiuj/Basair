@@ -4,9 +4,11 @@ import { useApp } from '../hooks/useApp';
 
 interface AyahProps {
     verse: Verse & { glyphText?: string };
+    children?: React.ReactNode;
+    disableId?: boolean;
 }
 
-const Ayah: React.FC<AyahProps> = ({ verse }) => {
+const Ayah: React.FC<AyahProps> = ({ verse, children, disableId }) => {
     const { state, actions } = useApp();
     const { font } = state;
 
@@ -86,7 +88,7 @@ const Ayah: React.FC<AyahProps> = ({ verse }) => {
         return (
              <span 
                 {...ayahEventHandlers}
-                id={`ayah-${verse.verse_key.replace(':', '-')}`}
+                id={disableId ? undefined : `ayah-${verse.verse_key.replace(':', '-')}`}
                 onContextMenu={(e) => {
                     e.preventDefault();
                     actions.selectAyah(verse);
@@ -97,7 +99,7 @@ const Ayah: React.FC<AyahProps> = ({ verse }) => {
                 }}
                 className={`ayah-container inline relative cursor-pointer pointer-events-auto ${isPlaying ? 'bg-emerald-500/20 rounded-md' : ''} transition-colors duration-300`}
             >
-                {text}
+                {children || text}
             </span>
         );
     }
