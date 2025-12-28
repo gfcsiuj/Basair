@@ -2,7 +2,6 @@ const CACHE_NAME = 'basaier-cache-v1';
 const urlsToCache = [
   '/',
   '/index.html',
-  '/index.css',
   '/icon.svg',
   '/maskable_icon.svg',
   '/manifest.json'

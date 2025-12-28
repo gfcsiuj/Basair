@@ -88,8 +88,10 @@ const QuranPage: React.FC<{
         if (!pageVerses) return null;
         const map = new Map<number, Verse>();
         for (const verse of pageVerses) {
-            for (const word of verse.words) {
-                map.set(word.id, verse);
+            if (verse.words) {
+                for (const word of verse.words) {
+                    map.set(word.id, verse);
+                }
             }
         }
         return map;
