@@ -6,17 +6,6 @@ import { useApp } from '../../hooks/useApp';
 const SettingsPanel: React.FC = () => {
     const { state, actions } = useApp();
 
-    const sortedReciters = useMemo(() => {
-        const favorites = new Set(state.favoriteReciters);
-        return [...state.reciters].sort((a, b) => {
-            const aIsFav = favorites.has(a.id);
-            const bIsFav = favorites.has(b.id);
-            if (aIsFav && !bIsFav) return -1;
-            if (!aIsFav && bIsFav) return 1;
-            return a.reciter_name.localeCompare(b.reciter_name, 'ar');
-        });
-    }, [state.reciters, state.favoriteReciters]);
-
     const themes: { id: Theme; name: string; icon: string; color: string }[] = [
         { id: 'light', name: 'فاتح', icon: 'fa-sun', color: 'text-yellow-500' },
         { id: 'dark', name: 'داكن', icon: 'fa-moon', color: 'text-blue-400' },
@@ -62,9 +51,13 @@ const SettingsPanel: React.FC = () => {
                  <div className="space-y-4">
                     <div>
                         <label className="block text-sm mb-2 text-text-secondary">القارئ</label>
-                        <select value={state.selectedReciterId} onChange={(e) => actions.setReciter(parseInt(e.target.value))} className="input w-full bg-bg-primary border-border focus:border-primary">
-                            {sortedReciters.map(reciter => <option key={reciter.id} value={reciter.id}>{state.favoriteReciters.includes(reciter.id) ? '⭐ ' : ''}{reciter.reciter_name}</option>)}
-                        </select>
+                        <button
+                            onClick={() => actions.setState(s => ({ ...s, isReciterModalOpen: true }))}
+                            className="input w-full bg-bg-primary border-border text-start flex justify-between items-center"
+                        >
+                            <span>{state.reciters.find(r => r.id === state.selectedReciterId)?.reciter_name || 'اختر القارئ'}</span>
+                            <i className="fas fa-chevron-down text-text-tertiary"></i>
+                        </button>
                     </div>
                      <div>
                         <label className="block text-sm mb-2 text-text-secondary">سرعة التلاوة ({state.playbackRate}x)</label>
@@ -76,15 +69,23 @@ const SettingsPanel: React.FC = () => {
                     </div>
                     <div>
                         <label className="block text-sm mb-2 text-text-secondary">التفسير</label>
-                        <select value={state.selectedTafsirId} onChange={(e) => actions.setTafsir(parseInt(e.target.value))} className="input w-full bg-bg-primary border-border focus:border-primary">
-                            {state.tafsirs.map(tafsir => <option key={tafsir.id} value={tafsir.id}>{tafsir.name}</option>)}
-                        </select>
+                        <button
+                            onClick={() => actions.setState(s => ({ ...s, isTafsirModalOpen: true }))}
+                            className="input w-full bg-bg-primary border-border text-start flex justify-between items-center"
+                        >
+                            <span>{state.tafsirs.find(t => t.id === state.selectedTafsirId)?.name || 'اختر التفسير'}</span>
+                            <i className="fas fa-chevron-down text-text-tertiary"></i>
+                        </button>
                     </div>
                     <div>
                         <label className="block text-sm mb-2 text-text-secondary">الترجمة</label>
-                        <select value={state.selectedTranslationId} onChange={(e) => actions.setTranslation(parseInt(e.target.value))} className="input w-full bg-bg-primary border-border focus:border-primary">
-                            {state.translations.map(translation => <option key={translation.id} value={translation.id}>{translation.name}</option>)}
-                        </select>
+                         <button
+                            onClick={() => actions.setState(s => ({ ...s, isTranslationModalOpen: true }))}
+                            className="input w-full bg-bg-primary border-border text-start flex justify-between items-center"
+                        >
+                            <span>{state.translations.find(t => t.id === state.selectedTranslationId)?.name || 'اختر الترجمة'}</span>
+                            <i className="fas fa-chevron-down text-text-tertiary"></i>
+                        </button>
                     </div>
                 </div>
             )

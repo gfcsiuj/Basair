@@ -23,6 +23,7 @@ import ShareImageGenerator from './components/ShareImageGenerator';
 import Onboarding from './components/Onboarding';
 import WordPopup from './components/WordPopup';
 import AyahContextMenu from './components/AyahContextMenu';
+import SelectionModal from './components/SelectionModal';
 import { AppContext } from './context';
 
 
@@ -37,69 +38,6 @@ const customReciters: Reciter[] = [
 ];
 
 // --- Reusable Modals (Moved here to avoid stacking context issues) ---
-
-const ReciterSelectionModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-    const { state, actions } = useApp();
-    const [searchTerm, setSearchTerm] = useState('');
-
-    const sortedReciters = useMemo(() => {
-        const favorites = new Set(state.favoriteReciters);
-        return [...state.reciters].sort((a, b) => {
-            const aIsFav = favorites.has(a.id);
-            const bIsFav = favorites.has(b.id);
-            if (aIsFav && !bIsFav) return -1;
-            if (!aIsFav && bIsFav) return 1;
-            return a.reciter_name.localeCompare(b.reciter_name, 'ar');
-        });
-    }, [state.reciters, state.favoriteReciters]);
-
-    const filteredReciters = useMemo(() =>
-        sortedReciters.filter(r =>
-            r.reciter_name.toLowerCase().includes(searchTerm.toLowerCase())
-        ), [sortedReciters, searchTerm]);
-
-    const handleSelectReciter = (id: number) => {
-        actions.setReciter(id);
-        onClose();
-    };
-
-    return (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] grid place-items-center p-4 animate-fadeIn" onClick={onClose}>
-            <div className="bg-bg-primary rounded-xl w-full max-w-sm max-h-[70vh] shadow-xl flex flex-col animate-scaleIn" onClick={e => e.stopPropagation()}>
-                <div className="flex items-center justify-between p-4 border-b border-border">
-                    <h3 className="font-bold text-lg text-text-primary">اختر القارئ</h3>
-                    <button onClick={onClose} className="p-2 text-text-secondary hover:bg-bg-secondary rounded-full">
-                        <i className="fas fa-times text-xl"></i>
-                    </button>
-                </div>
-                <div className="p-2 border-b border-border">
-                    <input type="search" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="ابحث عن قارئ..." className="input w-full bg-bg-secondary border-border" />
-                </div>
-                <div className="flex-1 overflow-y-auto custom-scrollbar">
-                    {filteredReciters.map(reciter => (
-                         <div key={reciter.id} onClick={() => handleSelectReciter(reciter.id)} className="flex items-center w-full px-4 py-3 hover:bg-bg-secondary transition-colors group cursor-pointer">
-                            <div className="flex-1 text-center">
-                                <span className={`${state.selectedReciterId === reciter.id ? 'font-bold text-primary' : 'text-text-primary'}`}>
-                                    {reciter.reciter_name}
-                                </span>
-                            </div>
-                            <button 
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    actions.toggleFavoriteReciter(reciter.id);
-                                }}
-                                className="p-2 rounded-full hover:bg-bg-tertiary transition-colors"
-                                aria-label={`Mark ${reciter.reciter_name} as favorite`}
-                            >
-                                <i className={`${state.favoriteReciters.includes(reciter.id) ? 'fas fa-star text-yellow-500' : 'far fa-star text-text-tertiary group-hover:text-yellow-500'}`}></i>
-                            </button>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        </div>
-    );
-};
 
 const RangeSelectionModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     const { state, actions } = useApp();
@@ -261,7 +199,11 @@ const App: React.FC = () => {
         audioCurrentTime: 0,
         isVerseByVerseLayout: JSON.parse(localStorage.getItem('isVerseByVerseLayout') || 'false'),
         favoriteReciters: JSON.parse(localStorage.getItem('favoriteReciters') || '[]'),
+        favoriteTafsirs: JSON.parse(localStorage.getItem('favoriteTafsirs') || '[]'),
+        favoriteTranslations: JSON.parse(localStorage.getItem('favoriteTranslations') || '[]'),
         isReciterModalOpen: false,
+        isTafsirModalOpen: false,
+        isTranslationModalOpen: false,
         isRangeModalOpen: false,
         wordGlyphData: null,
         layoutDb: null,
@@ -830,6 +772,26 @@ const App: React.FC = () => {
         });
     }, []);
 
+    const toggleFavoriteTafsir = useCallback((id: number) => {
+        setState(s => {
+            const newFavorites = s.favoriteTafsirs.includes(id)
+                ? s.favoriteTafsirs.filter(favId => favId !== id)
+                : [...s.favoriteTafsirs, id];
+            localStorage.setItem('favoriteTafsirs', JSON.stringify(newFavorites));
+            return { ...s, favoriteTafsirs: newFavorites };
+        });
+    }, []);
+
+    const toggleFavoriteTranslation = useCallback((id: number) => {
+        setState(s => {
+            const newFavorites = s.favoriteTranslations.includes(id)
+                ? s.favoriteTranslations.filter(favId => favId !== id)
+                : [...s.favoriteTranslations, id];
+            localStorage.setItem('favoriteTranslations', JSON.stringify(newFavorites));
+            return { ...s, favoriteTranslations: newFavorites };
+        });
+    }, []);
+
     // New CRUD Actions
     const addKhatmah = useCallback((k: Omit<Khatmah, 'id'|'completed'|'pagesRead'>) => {
         setState(s => {
@@ -997,7 +959,7 @@ const App: React.FC = () => {
             setReciter, setTafsir, setTranslation, fetchWithRetry, setState, recordUserActivity, toggleUIVisibility, selectWord,
             setPlaybackRate, addMemorizationPoints,
             startDownload, deleteDownloadedContent, setRepeatMode, toggleVerseByVerseLayout,
-            getPageData, toggleFavoriteReciter,
+            getPageData, toggleFavoriteReciter, toggleFavoriteTafsir, toggleFavoriteTranslation,
             loadPrayerTimes,
             toggleNotifications,
         }
@@ -1005,7 +967,10 @@ const App: React.FC = () => {
         playRange, toggleBookmark, addKhatmah, updateKhatmahProgress, deleteKhatmah, addNote, updateNote, deleteNote, addTasbeehCounter,
         updateTasbeehCounter, updateTasbeehCounterDetails, deleteTasbeehCounter, resetTasbeehCounter, resetAllTasbeehCounters, setReciter,
         setTafsir, setTranslation, fetchWithRetry, recordUserActivity, toggleUIVisibility, selectWord, setPlaybackRate,
-        addMemorizationPoints, startDownload, deleteDownloadedContent, setRepeatMode, toggleVerseByVerseLayout, getPageData, toggleFavoriteReciter, loadPrayerTimes, toggleNotifications]);
+        addMemorizationPoints, startDownload, deleteDownloadedContent, setRepeatMode, toggleVerseByVerseLayout, getPageData, toggleFavoriteReciter, toggleFavoriteTafsir, toggleFavoriteTranslation, loadPrayerTimes, toggleNotifications]);
+
+    // Expose actions for inline usage if needed (though using contextValue directly is better)
+    const actions = contextValue.actions;
     
     useEffect(() => {
         document.documentElement.setAttribute('data-theme', state.theme);
@@ -1184,7 +1149,39 @@ const App: React.FC = () => {
                 <WordPopup />
                 <AyahContextMenu />
                 <ShareImageGenerator />
-                {state.isReciterModalOpen && <ReciterSelectionModal onClose={() => setState(s => ({...s, isReciterModalOpen: false}))} />}
+                {state.isReciterModalOpen && (
+                    <SelectionModal
+                        title="اختر القارئ"
+                        items={state.reciters.map(r => ({ id: r.id, name: r.reciter_name }))}
+                        selectedId={state.selectedReciterId}
+                        favorites={state.favoriteReciters}
+                        onClose={() => setState(s => ({...s, isReciterModalOpen: false}))}
+                        onSelect={actions.setReciter}
+                        onToggleFavorite={actions.toggleFavoriteReciter}
+                    />
+                )}
+                {state.isTafsirModalOpen && (
+                    <SelectionModal
+                        title="اختر التفسير"
+                        items={state.tafsirs.map(t => ({ id: t.id, name: t.name }))}
+                        selectedId={state.selectedTafsirId}
+                        favorites={state.favoriteTafsirs}
+                        onClose={() => setState(s => ({...s, isTafsirModalOpen: false}))}
+                        onSelect={actions.setTafsir}
+                        onToggleFavorite={actions.toggleFavoriteTafsir}
+                    />
+                )}
+                 {state.isTranslationModalOpen && (
+                    <SelectionModal
+                        title="اختر الترجمة"
+                        items={state.translations.map(t => ({ id: t.id, name: t.name }))}
+                        selectedId={state.selectedTranslationId}
+                        favorites={state.favoriteTranslations}
+                        onClose={() => setState(s => ({...s, isTranslationModalOpen: false}))}
+                        onSelect={actions.setTranslation}
+                        onToggleFavorite={actions.toggleFavoriteTranslation}
+                    />
+                )}
                 {state.isRangeModalOpen && <RangeSelectionModal onClose={() => setState(s => ({...s, isRangeModalOpen: false}))} />}
             </div>
         </AppContext.Provider>

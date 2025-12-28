@@ -220,7 +220,11 @@ export interface AppState {
     audioCurrentTime: number;
     isVerseByVerseLayout: boolean;
     favoriteReciters: number[];
+    favoriteTafsirs: number[];
+    favoriteTranslations: number[];
     isReciterModalOpen: boolean;
+    isTafsirModalOpen: boolean;
+    isTranslationModalOpen: boolean;
     isRangeModalOpen: boolean;
     wordGlyphData: { [key: string]: { id: number; text: string } } | null;
     layoutDb: Database | null;
@@ -277,6 +281,8 @@ export interface AppActions {
     toggleVerseByVerseLayout: () => void;
     getPageData: (pageNumber: number) => Promise<Verse[] | null>;
     toggleFavoriteReciter: (id: number) => void;
+    toggleFavoriteTafsir: (id: number) => void;
+    toggleFavoriteTranslation: (id: number) => void;
     loadPrayerTimes: () => Promise<void>;
     toggleNotifications: () => Promise<void>;
 }
