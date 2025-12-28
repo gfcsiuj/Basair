@@ -86,7 +86,16 @@ const Ayah: React.FC<AyahProps> = ({ verse }) => {
         return (
              <span 
                 {...ayahEventHandlers}
-                className={`ayah-container inline relative cursor-pointer ${isPlaying ? 'bg-emerald-500/20 rounded-md' : ''} transition-colors duration-300`}
+                id={`ayah-${verse.verse_key.replace(':', '-')}`}
+                onContextMenu={(e) => {
+                    e.preventDefault();
+                    actions.selectAyah(verse);
+                }}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    actions.selectAyah(verse);
+                }}
+                className={`ayah-container inline relative cursor-pointer pointer-events-auto ${isPlaying ? 'bg-emerald-500/20 rounded-md' : ''} transition-colors duration-300`}
             >
                 {text}
             </span>
