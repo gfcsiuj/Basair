@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../hooks/useApp';
 import Bismillah from './Bismillah';
 import SurahHeader from './SurahHeader';
+import Ayah from './Ayah';
 import { Verse } from '../types';
 
 interface LineData {
@@ -82,9 +83,24 @@ const QuranPage: React.FC<{
         return map;
     }, [wordGlyphData]);
 
+    // Create a map of wordId to Verse for easy lookup
+    const wordIdToVerseMap = useMemo(() => {
+        if (!pageVerses) return null;
+        const map = new Map<number, Verse>();
+        for (const verse of pageVerses) {
+            for (const word of verse.words) {
+                map.set(word.id, verse);
+            }
+        }
+        return map;
+    }, [pageVerses]);
+
     // Memoize the entire rendered page content for performance
     const pageContent = useMemo(() => {
         if (!linesForPage.length || !surahs) return null;
+
+        // Keep track of which verses have already had their ID rendered on this page
+        const renderedVerseIds = new Set<string>();
 
         return linesForPage.map((line) => {
             let lineContent: React.ReactNode = null;
@@ -103,13 +119,62 @@ const QuranPage: React.FC<{
                     lineContent = <Bismillah />;
                     break;
                 case 'ayah':
-                    if (memoizedWordGlyphsById && line.first_word_id && line.last_word_id) {
-                        let wordsInLine = '';
-                        // Efficiently build the line string using the Map
+                    if (memoizedWordGlyphsById && wordIdToVerseMap && line.first_word_id && line.last_word_id) {
+                        const segments: React.ReactNode[] = [];
+                        let currentVerse: Verse | null = null;
+                        let currentSegmentText = '';
+                        let currentSegmentKey = 0;
+
                         for (let i = line.first_word_id; i <= line.last_word_id; i++) {
-                            wordsInLine += memoizedWordGlyphsById.get(i) || '';
+                            const wordText = memoizedWordGlyphsById.get(i) || '';
+                            const verse = wordIdToVerseMap.get(i);
+
+                            if (verse !== currentVerse) {
+                                // Close previous segment if exists
+                                if (currentVerse && currentSegmentText) {
+                                    const isFirstSegment = !renderedVerseIds.has(currentVerse.verse_key);
+                                    if (isFirstSegment) renderedVerseIds.add(currentVerse.verse_key);
+
+                                    segments.push(
+                                        <Ayah
+                                            key={`${currentVerse.id}-${currentSegmentKey++}`}
+                                            verse={currentVerse}
+                                            disableId={!isFirstSegment}
+                                        >
+                                            {currentSegmentText}
+                                        </Ayah>
+                                    );
+                                }
+
+                                // Start new segment
+                                currentVerse = verse || null;
+                                currentSegmentText = wordText;
+                            } else {
+                                // Continue current segment
+                                currentSegmentText += wordText;
+                            }
                         }
-                        lineContent = wordsInLine;
+
+                        // Push the last segment
+                        if (currentVerse && currentSegmentText) {
+                            const isFirstSegment = !renderedVerseIds.has(currentVerse.verse_key);
+                            if (isFirstSegment) renderedVerseIds.add(currentVerse.verse_key);
+
+                            segments.push(
+                                <Ayah
+                                    key={`${currentVerse.id}-${currentSegmentKey++}`}
+                                    verse={currentVerse}
+                                    disableId={!isFirstSegment}
+                                >
+                                    {currentSegmentText}
+                                </Ayah>
+                            );
+                        } else if (!currentVerse && currentSegmentText) {
+                             // Fallback for text without verse association (shouldn't typically happen for ayah lines)
+                             segments.push(<span key="orphan">{currentSegmentText}</span>);
+                        }
+
+                        lineContent = segments;
                     }
                     break;
                 default:
@@ -122,7 +187,7 @@ const QuranPage: React.FC<{
                 </div>
             );
         });
-    }, [linesForPage, surahs, memoizedWordGlyphsById]);
+    }, [linesForPage, surahs, memoizedWordGlyphsById, wordIdToVerseMap]);
 
     if (isLoading && !pageContent) {
         return (
