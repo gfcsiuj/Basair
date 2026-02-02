@@ -1,0 +1,8 @@
+{
+  "name": "مشروع بصائر ",
+  "description": "تطبيق قرآني متكامل مع التفسير والترجمة والاستماع للقراء المختلفين ووضع التحفيظ الذكي بالصوت.",
+  "requestFramePermissions": [
+    "microphone",
+    "geolocation"
+  ]
+}
