@@ -1,22 +1,26 @@
-const CACHE_NAME = 'basaier-cache-v1';
+const CACHE_NAME = 'basaier-cache-v3'; // Incremented version to force update
 const urlsToCache = [
   '/',
   '/index.html',
   '/index.css',
   '/icon.svg',
   '/maskable_icon.svg',
-  '/manifest.json'
+  '/manifest.json',
+  '/qpc-v4.json', // Cache the large JSON file
+  '/qpc-v4-tajweed-15-lines.db', // Cache the DB file
+  '/sql-wasm.wasm', // Cache the WASM file
+  '/quran-common.ttf'
 ];
 
 self.addEventListener('install', (event) => {
-  // Perform install steps
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        console.log('Opened cache');
+        console.log('Opened cache and pre-caching critical assets');
         return cache.addAll(urlsToCache);
       })
   );
+  self.skipWaiting(); // Activate worker immediately
 });
 
 self.addEventListener('activate', (event) => {
@@ -32,38 +36,66 @@ self.addEventListener('activate', (event) => {
       );
     })
   );
+  self.clients.claim(); // Become available to all pages
 });
 
 self.addEventListener('fetch', (event) => {
+  const requestUrl = new URL(event.request.url);
+
+  // Aggressive Cache-First Strategy for static assets and large files
+  if (
+    requestUrl.pathname.endsWith('.json') ||
+    requestUrl.pathname.endsWith('.ttf') ||
+    requestUrl.pathname.endsWith('.db') ||
+    requestUrl.pathname.endsWith('.wasm') ||
+    requestUrl.pathname.startsWith('/assets/')
+  ) {
+    event.respondWith(
+      caches.open(CACHE_NAME).then((cache) => {
+        return cache.match(event.request).then((response) => {
+          if (response) {
+            return response; // Return cached response immediately
+          }
+          return fetch(event.request).then((networkResponse) => {
+            cache.put(event.request, networkResponse.clone());
+            return networkResponse;
+          });
+        });
+      })
+    );
+    return;
+  }
+
+  // Stale-While-Revalidate for other requests (HTML, JS, etc.)
   event.respondWith(
     caches.match(event.request)
       .then((response) => {
-        // Cache hit - return response
         if (response) {
+          // Return cached response but update cache in background
+          const fetchPromise = fetch(event.request).then((networkResponse) => {
+            if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+              const responseToCache = networkResponse.clone();
+              caches.open(CACHE_NAME).then((cache) => {
+                cache.put(event.request, responseToCache);
+              });
+            }
+            return networkResponse;
+          });
           return response;
         }
 
         return fetch(event.request).then(
           (response) => {
-            // Check if we received a valid response
             if (!response || response.status !== 200 || (response.type !== 'basic' && response.type !== 'cors')) {
               return response;
             }
-
-            // IMPORTANT: Clone the response. A response is a stream
-            // and because we want the browser to consume the response
-            // as well as the cache consuming the response, we need
-            // to clone it so we have two streams.
             const responseToCache = response.clone();
-
-            // Don't cache POST requests or chrome extension requests
             if (event.request.method === 'GET' && !event.request.url.includes('chrome-extension')) {
-                 caches.open(CACHE_NAME)
-                    .then((cache) => {
-                        cache.put(event.request, responseToCache);
-                    });
+              caches.open(CACHE_NAME)
+                .then((cache) => {
+                  cache.put(event.request, responseToCache);
+                });
             }
-
             return response;
           }
         );
