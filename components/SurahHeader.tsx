@@ -13,12 +13,13 @@ const SurahHeader: React.FC<SurahHeaderProps> = ({ surah }) => {
     return (
         <div className="surah-header-container mb-2 w-full relative">
             {/* Decorative frame from quran-common font */}
-            <div
-                style={{ fontFamily: 'quran-common', fontFeatureSettings: '"calt", "liga"' }}
-                className="text-5xl md:text-6xl text-center text-primary leading-none"
-                aria-hidden="true"
-            >
-                {headerLigature}
+            {/* Decorative frame image */}
+            <div className="w-full relative flex justify-center items-center">
+                <img
+                    src="/surah_hedar.svg"
+                    alt="Surah Header Frame"
+                    className="w-full h-auto object-contain select-none pointer-events-none"
+                />
             </div>
 
             {/* Surah name centered */}
