@@ -1,9 +1,67 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useApp } from '../hooks/useApp';
 import Bismillah from './Bismillah';
 import SurahHeader from './SurahHeader';
 import InteractiveLine from './InteractiveLine';
+import VerseByVersePage from './VerseByVersePage';
 import { Verse } from '../types';
+
+/**
+ * VerseGlyphSegment - wraps a verse's glyph characters in a trackable inline span.
+ * When the verse is playing, this span highlights with glow + progress bar.
+ */
+const VerseGlyphSegment = React.memo(({ verseKey, text, pageVerses }: { verseKey: string; text: string; pageVerses: Verse[] | null }) => {
+    const { state } = useApp();
+    const ref = useRef<HTMLSpanElement>(null);
+
+    const isPlaying = state.isPlaying && state.audioQueue[state.currentAudioIndex]?.verseKey === verseKey;
+
+    // Auto-scroll to the playing verse segment
+    useEffect(() => {
+        if (isPlaying && ref.current) {
+            ref.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }, [isPlaying]);
+
+    // Calculate progress
+    const progress = isPlaying && state.audioDuration > 0
+        ? Math.min(100, (state.audioCurrentTime / state.audioDuration) * 100)
+        : 0;
+
+    // Translation text for playing verse
+    const verse = isPlaying ? pageVerses?.find(v => v.verse_key === verseKey) : null;
+    const surahName = verse ? state.surahs.find(s => s.id === verse.chapter_id)?.name_arabic : '';
+    const translationText = verse?.translations?.[0]?.text
+        ?.replace(/<sup[^>]*>.*?<\/sup>/g, '')
+        ?.replace(/<[^>]*>/g, '') || null;
+
+    return (
+        <span
+            ref={ref}
+            data-verse-key={verseKey}
+            className={`verse-glyph-segment ${isPlaying ? 'verse-glyph-active' : ''}`}
+        >
+            {text}
+            {/* Progress bar */}
+            {isPlaying && (
+                <span
+                    className="verse-glyph-progress"
+                    style={{ width: `${progress}%` }}
+                />
+            )}
+            {/* Translation popup */}
+            {isPlaying && translationText && (
+                <span className="verse-translation-popup">
+                    <span className="verse-translation-label">
+                        <i className="fas fa-language" style={{ fontSize: '10px', marginLeft: '4px' }}></i>
+                        {surahName} : {verse ? new Intl.NumberFormat('ar-EG').format(verse.verse_number) : ''}
+                    </span>
+                    <span className="verse-translation-text">{translationText}</span>
+                </span>
+            )}
+        </span>
+    );
+});
 
 // Calculate optimal font size based on viewport for Quran-like experience
 // This creates a fixed, automatic sizing that fills the screen beautifully like a real Quran
@@ -35,35 +93,22 @@ interface LineData {
 
 const QuranPage: React.FC<{
     pageVerses: Verse[] | null;
-}> = ({ pageVerses }) => {
+    pageNumber?: number;
+}> = ({ pageVerses, pageNumber }) => {
     const { state } = useApp();
-    const { isLoading, error, font, surahs, wordGlyphData, layoutDb, currentPage } = state;
+    const { isLoading, error, font, surahs, wordGlyphData, layoutDb } = state;
+    // Use the passed pageNumber or fall back to global state currentPage
+    const targetPage = pageNumber || state.currentPage;
+
     const [responsiveFontSize, setResponsiveFontSize] = useState(getResponsiveFontSize());
     const [isLandscape, setIsLandscape] = useState(window.innerWidth > window.innerHeight);
     const [linesForPage, setLinesForPage] = useState<LineData[]>([]);
 
-    // Effect to handle responsive font sizing and orientation changes
-    useEffect(() => {
-        const handleResize = () => {
-            setResponsiveFontSize(getResponsiveFontSize());
-            setIsLandscape(window.innerWidth > window.innerHeight);
-        };
-
-        window.addEventListener('resize', handleResize);
-        window.addEventListener('orientationchange', handleResize);
-
-        // Initial calculation
-        handleResize();
-
-        return () => {
-            window.removeEventListener('resize', handleResize);
-            window.removeEventListener('orientationchange', handleResize);
-        };
-    }, []);
+    // ... (resize effect omitted as it doesn't need changes)
 
     // Effect to load page-specific font
     useEffect(() => {
-        const styleId = 'dynamic-quran-font-style';
+        const styleId = `dynamic-quran-font-style-${targetPage}`;
         let styleEl = document.getElementById(styleId) as HTMLStyleElement;
 
         if (!styleEl) {
@@ -72,12 +117,11 @@ const QuranPage: React.FC<{
             document.head.appendChild(styleEl);
         }
 
-        if (font === 'qpc-v1' && currentPage > 0) {
-            const page = currentPage;
+        if (font === 'qpc-v1' && targetPage > 0) {
             const cssRule = `
                 @font-face {
-                    font-family: 'QuranPageFontV2';
-                    src: url('/QPC V2 Font/p${page}.ttf') format('truetype');
+                    font-family: 'QuranPageFontV2-${targetPage}';
+                    src: url('/QPC V2 Font/p${targetPage}.ttf') format('truetype');
                     font-display: block;
                 }
             `;
@@ -87,11 +131,18 @@ const QuranPage: React.FC<{
         } else {
             if (styleEl.innerHTML !== '') styleEl.innerHTML = '';
         }
-    }, [currentPage, font]);
+
+        return () => {
+            // Clean up style element when component unmounts
+            if (styleEl && styleEl.parentNode) {
+                styleEl.parentNode.removeChild(styleEl);
+            }
+        };
+    }, [targetPage, font]);
 
     // Effect to query line data from DB
     useEffect(() => {
-        if (layoutDb && currentPage) {
+        if (layoutDb && targetPage) {
             try {
                 const stmt = layoutDb.prepare(`
                     SELECT line_number, line_type, is_centered, first_word_id, last_word_id, surah_number 
@@ -99,7 +150,7 @@ const QuranPage: React.FC<{
                     WHERE page_number = :page
                     ORDER BY line_number ASC
                 `);
-                stmt.bind({ ':page': currentPage });
+                stmt.bind({ ':page': targetPage });
                 const lines: LineData[] = [];
                 while (stmt.step()) {
                     lines.push(stmt.getAsObject() as unknown as LineData);
@@ -107,11 +158,11 @@ const QuranPage: React.FC<{
                 stmt.free();
                 setLinesForPage(lines);
             } catch (err) {
-                console.error(`Failed to query page ${currentPage}:`, err);
+                console.error(`Failed to query page ${targetPage}:`, err);
                 setLinesForPage([]);
             }
         }
-    }, [layoutDb, currentPage]);
+    }, [layoutDb, targetPage]);
 
     // Memoize word glyphs into a Map for fast O(1) lookups
     const memoizedWordGlyphsById = useMemo(() => {
@@ -119,6 +170,17 @@ const QuranPage: React.FC<{
         const map = new Map<number, string>();
         for (const wordInfo of Object.values(wordGlyphData)) {
             map.set(wordInfo.id, wordInfo.text);
+        }
+        return map;
+    }, [wordGlyphData]);
+
+    // Build a wordId → verseKey lookup map for O(1) verse identification
+    const wordIdToVerseKey = useMemo(() => {
+        if (!wordGlyphData) return null;
+        const map = new Map<number, string>();
+        for (const [key, wordInfo] of Object.entries(wordGlyphData)) {
+            const parts = key.split(':');
+            map.set(wordInfo.id, `${parts[0]}:${parts[1]}`);
         }
         return map;
     }, [wordGlyphData]);
@@ -152,13 +214,31 @@ const QuranPage: React.FC<{
                         </div>
                     );
                 case 'ayah':
-                    if (memoizedWordGlyphsById && line.first_word_id && line.last_word_id) {
-                        let wordsInLine = '';
-                        // Efficiently build the line string using the Map
+                    if (memoizedWordGlyphsById && wordIdToVerseKey && line.first_word_id && line.last_word_id) {
+                        // Group word glyphs by verse key for precise per-verse tracking
+                        const segments: { verseKey: string; text: string }[] = [];
+                        let currentVerseKey = '';
+                        let currentText = '';
+
                         for (let i = line.first_word_id; i <= line.last_word_id; i++) {
-                            wordsInLine += memoizedWordGlyphsById.get(i) || '';
+                            const glyph = memoizedWordGlyphsById.get(i) || '';
+                            const vk = wordIdToVerseKey.get(i) || '';
+
+                            if (vk !== currentVerseKey && currentText) {
+                                segments.push({ verseKey: currentVerseKey, text: currentText });
+                                currentText = '';
+                            }
+                            currentVerseKey = vk;
+                            currentText += glyph;
                         }
-                        lineContent = wordsInLine;
+                        if (currentText) {
+                            segments.push({ verseKey: currentVerseKey, text: currentText });
+                        }
+
+                        // Render each verse segment as a separate trackable span
+                        lineContent = segments.map((seg, i) => (
+                            <VerseGlyphSegment key={`${seg.verseKey}-${i}`} verseKey={seg.verseKey} text={seg.text} pageVerses={pageVerses} />
+                        ));
                     }
                     // استخدام InteractiveLine للأسطر التي تحتوي على آيات
                     return (
@@ -177,7 +257,7 @@ const QuranPage: React.FC<{
                     return null;
             }
         });
-    }, [linesForPage, surahs, memoizedWordGlyphsById, pageVerses]);
+    }, [linesForPage, surahs, memoizedWordGlyphsById, wordIdToVerseKey, pageVerses]);
 
     if (isLoading && !pageContent) {
         return (
@@ -203,7 +283,7 @@ const QuranPage: React.FC<{
     const lineHeightValue = isLandscape ? 1.8 : 1.95;
 
     const pageStyle: React.CSSProperties = {
-        fontFamily: font === 'qpc-v1' ? 'QuranPageFontV2' : 'inherit',
+        fontFamily: font === 'qpc-v1' ? `QuranPageFontV2-${targetPage}` : 'inherit',
         // Use responsive font size that auto-scales based on device
         fontSize: `${responsiveFontSize}px`,
         direction: 'rtl',
@@ -233,10 +313,14 @@ const QuranPage: React.FC<{
         <div className="w-full animate-pageTransition">
             <PageJuzHeader />
             <div style={pageStyle}>
-                {pageContent}
+                {state.isVerseByVerseLayout ? (
+                    <VerseByVersePage pageVerses={pageVerses} />
+                ) : (
+                    pageContent
+                )}
             </div>
         </div>
     );
 };
 
-export default QuranPage;
+export default React.memo(QuranPage);

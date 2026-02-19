@@ -5,7 +5,6 @@ import type { Database } from 'sql.js';
 
 export enum ReadingMode {
     Reading = 'reading',
-    Memorization = 'memorization',
 }
 
 export enum Panel {
@@ -32,7 +31,7 @@ export enum RepeatMode {
     All = 'all',
 }
 
-export type Theme = 'light' | 'dark' | 'sepia' | 'blue';
+export type Theme = 'light' | 'dark' | 'classic' | 'custom';
 export type Font = 'qpc-v1';
 
 export interface Surah {
@@ -92,15 +91,7 @@ export interface Word {
     }
 }
 
-export enum AyahWordState {
-    Hidden = 'hidden',
-    Waiting = 'waiting',
-    Correct = 'correct',
-    Incorrect = 'incorrect',
-    Revealed = 'revealed',
-    Hinted = 'hinted',
-    Skipped = 'skipped',
-}
+
 
 
 export interface Verse {
@@ -211,7 +202,8 @@ export interface AppState {
     isFirstLaunch: boolean;
     selectedWord: { verse: Verse, word: Word } | null;
     playbackRate: number;
-    memorizationStats: { points: number; streak: number };
+    isAutoScrolling: boolean;
+    autoScrollSpeed: number;
     downloadProgress: { [key: string]: { loaded: number; total: number; status: DownloadStatus } };
     offlineStatus: {
         quranText: boolean;
@@ -235,6 +227,7 @@ export interface AppState {
     locationName: string | null;
     prayerTimesStatus: 'idle' | 'loading' | 'success' | 'error';
     notificationPermission: NotificationPermission;
+    customThemeColor: string;
     areNotificationsEnabled: boolean;
 }
 
@@ -277,7 +270,8 @@ export interface AppActions {
     toggleUIVisibility: () => void;
     selectWord: (verse: Verse, word: Word) => void;
     setPlaybackRate: (rate: number) => void;
-    addMemorizationPoints: (points: number) => void;
+    toggleAutoScroll: () => void;
+    setAutoScrollSpeed: (speed: number) => void;
     startDownload: (type: 'quranText' | 'reciter' | 'translation', item: DownloadableItem) => Promise<void>;
     deleteDownloadedContent: (type: 'quranText' | 'reciter' | 'translation', id: number | string) => Promise<void>;
     setRepeatMode: (mode: RepeatMode) => void;
@@ -288,6 +282,7 @@ export interface AppActions {
     toggleFavoriteTranslation: (id: number) => void;
     loadPrayerTimes: () => Promise<void>;
     toggleNotifications: () => Promise<void>;
+    setCustomColor: (color: string) => void;
 }
 
 export interface AppContextType {

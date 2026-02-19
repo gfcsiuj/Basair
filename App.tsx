@@ -1,12 +1,12 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { GoogleGenAI } from "@google/genai";
 import initSqlJs, { type Database } from 'sql.js';
-import { Surah, Verse, Reciter, Tafsir, Translation, Bookmark, Khatmah, AppState, AppContextType, Panel, Theme, Font, ReadingMode, AyahWordState, SearchResponse, Note, TasbeehCounter, Word, DownloadableItem, RepeatMode } from './types';
+import { Surah, Verse, Reciter, Tafsir, Translation, Bookmark, Khatmah, AppState, AppContextType, Panel, Theme, Font, ReadingMode, SearchResponse, Note, TasbeehCounter, Word, DownloadableItem, RepeatMode } from './types';
 import { API_BASE, AUDIO_BASE, TOTAL_PAGES } from './constants';
 import * as offlineManager from './offlineManager';
 import { useApp } from './hooks/useApp';
 import MainReadingInterface from './components/MainReadingInterface';
-import MemorizationInterface from './components/MemorizationInterface';
+
 import AIAssistant from './components/AIAssistant';
 import { MenuPanel, StatisticsPanel, SupplicationsPanel, TasbeehPanel, NotesPanel } from './components/panels/MenuPanel';
 import IndexPanel from './components/panels/IndexPanel';
@@ -200,7 +200,8 @@ const App: React.FC = () => {
         aiAutoPrompt: null,
         selectedWord: null,
         playbackRate: parseFloat(localStorage.getItem('playbackRate') || '1'),
-        memorizationStats: JSON.parse(localStorage.getItem('memorizationStats') || '{"points":0,"streak":0}'),
+        isAutoScrolling: false,
+        autoScrollSpeed: 1,
         downloadProgress: {},
         offlineStatus: {
             quranText: false,
@@ -225,6 +226,7 @@ const App: React.FC = () => {
         prayerTimesStatus: 'idle',
         notificationPermission: 'default',
         areNotificationsEnabled: JSON.parse(localStorage.getItem('areNotificationsEnabled') || 'false'),
+        customThemeColor: localStorage.getItem('customThemeColor') || '#10b981',
     });
 
     // --- API & Data Loading ---
@@ -688,7 +690,45 @@ const App: React.FC = () => {
         setState(s => ({ ...s, theme }));
         localStorage.setItem('theme', theme);
         document.documentElement.setAttribute('data-theme', theme);
+        // Apply custom theme colors if switching to custom
+        if (theme === 'custom') {
+            const savedColor = localStorage.getItem('customThemeColor') || '#10b981';
+            applyCustomColor(savedColor);
+        }
     }, []);
+
+    const applyCustomColor = useCallback((hex: string) => {
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        // Generate lighter and darker variants
+        const lighten = (c: number, amt: number) => Math.min(255, Math.round(c + (255 - c) * amt));
+        const darken = (c: number, amt: number) => Math.max(0, Math.round(c * (1 - amt)));
+        const toHex = (r2: number, g2: number, b2: number) => `#${[r2, g2, b2].map(c => c.toString(16).padStart(2, '0')).join('')}`;
+
+        const root = document.documentElement;
+        root.style.setProperty('--custom-primary', hex);
+        root.style.setProperty('--custom-primary-light', toHex(lighten(r, 0.3), lighten(g, 0.3), lighten(b, 0.3)));
+        root.style.setProperty('--custom-primary-dark', toHex(darken(r, 0.2), darken(g, 0.2), darken(b, 0.2)));
+        root.style.setProperty('--custom-secondary', toHex(lighten(r, 0.1), lighten(g, 0.2), lighten(b, 0.4)));
+        root.style.setProperty('--custom-highlight', `${r}, ${g}, ${b}`);
+        // Keep background/text as light theme defaults for custom
+        root.style.setProperty('--custom-bg-primary', '#ffffff');
+        root.style.setProperty('--custom-bg-secondary', '#f9fafb');
+        root.style.setProperty('--custom-bg-tertiary', '#f3f4f6');
+        root.style.setProperty('--custom-text-primary', '#111827');
+        root.style.setProperty('--custom-text-secondary', '#6b7280');
+        root.style.setProperty('--custom-text-tertiary', '#9ca3af');
+        root.style.setProperty('--custom-border', '#e5e7eb');
+    }, []);
+
+    const setCustomColor = useCallback((color: string) => {
+        setState(s => ({ ...s, customThemeColor: color, theme: 'custom' as Theme }));
+        localStorage.setItem('customThemeColor', color);
+        localStorage.setItem('theme', 'custom');
+        document.documentElement.setAttribute('data-theme', 'custom');
+        applyCustomColor(color);
+    }, [applyCustomColor]);
 
     const setFont = useCallback((font: Font) => {
         setState(s => ({ ...s, font }));
@@ -936,12 +976,12 @@ const App: React.FC = () => {
         localStorage.setItem('repeatMode', mode);
     }, []);
 
-    const addMemorizationPoints = useCallback((points: number) => {
-        setState(s => {
-            const newStats = { ...s.memorizationStats, points: s.memorizationStats.points + points };
-            localStorage.setItem('memorizationStats', JSON.stringify(newStats));
-            return { ...s, memorizationStats: newStats };
-        });
+    const toggleAutoScroll = useCallback(() => {
+        setState(s => ({ ...s, isAutoScrolling: !s.isAutoScrolling }));
+    }, []);
+
+    const setAutoScrollSpeed = useCallback((speed: number) => {
+        setState(s => ({ ...s, autoScrollSpeed: speed }));
     }, []);
 
     const recordUserActivity = useCallback(() => {
@@ -970,21 +1010,25 @@ const App: React.FC = () => {
             playRange, toggleBookmark, addKhatmah, updateKhatmahProgress, deleteKhatmah, addNote, updateNote, deleteNote,
             addTasbeehCounter, updateTasbeehCounter, updateTasbeehCounterDetails, deleteTasbeehCounter, resetTasbeehCounter, resetAllTasbeehCounters,
             setReciter, setTafsir, setTranslation, fetchWithRetry, setState, recordUserActivity, toggleUIVisibility, selectWord,
-            setPlaybackRate, addMemorizationPoints,
+            setPlaybackRate, toggleAutoScroll, setAutoScrollSpeed,
             startDownload, deleteDownloadedContent, setRepeatMode, toggleVerseByVerseLayout,
             getPageData, toggleFavoriteReciter, toggleFavoriteTafsir, toggleFavoriteTranslation,
             loadPrayerTimes,
             toggleNotifications,
+            setCustomColor,
         }
     }), [state, loadPage, setTheme, setFont, setFontSize, openPanel, setReadingMode, selectAyah, togglePlayPause, playNext, playPrev,
         playRange, toggleBookmark, addKhatmah, updateKhatmahProgress, deleteKhatmah, addNote, updateNote, deleteNote, addTasbeehCounter,
         updateTasbeehCounter, updateTasbeehCounterDetails, deleteTasbeehCounter, resetTasbeehCounter, resetAllTasbeehCounters, setReciter,
         setTafsir, setTranslation, fetchWithRetry, recordUserActivity, toggleUIVisibility, selectWord, setPlaybackRate,
-        addMemorizationPoints, startDownload, deleteDownloadedContent, setRepeatMode, toggleVerseByVerseLayout, getPageData, toggleFavoriteReciter, toggleFavoriteTafsir, toggleFavoriteTranslation, loadPrayerTimes, toggleNotifications]);
+        toggleAutoScroll, setAutoScrollSpeed, startDownload, deleteDownloadedContent, setRepeatMode, toggleVerseByVerseLayout, getPageData, toggleFavoriteReciter, toggleFavoriteTafsir, toggleFavoriteTranslation, loadPrayerTimes, toggleNotifications, setCustomColor]);
 
     useEffect(() => {
         document.documentElement.setAttribute('data-theme', state.theme);
-    }, [state.theme]);
+        if (state.theme === 'custom') {
+            applyCustomColor(state.customThemeColor);
+        }
+    }, [state.theme, state.customThemeColor, applyCustomColor]);
 
     useEffect(() => {
         const audioEl = audioRef.current;
@@ -1134,7 +1178,6 @@ const App: React.FC = () => {
                 <audio ref={preloadAudioRef} className="hidden" preload="auto"></audio>
 
                 {state.readingMode === ReadingMode.Reading && <MainReadingInterface />}
-                {state.readingMode === ReadingMode.Memorization && <MemorizationInterface />}
 
                 <AIAssistant />
 

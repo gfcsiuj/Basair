@@ -33,14 +33,14 @@ const Panel: React.FC<PanelProps> = ({ id, title, children, headerActions }) => 
         if (!isDragging) return;
         const currentY = e.touches[0].clientY;
         let deltaY = currentY - touchStartY.current;
-        if (deltaY < 0) deltaY = 0; // Prevent dragging up
+        if (deltaY < 0) deltaY = 0;
         setTranslateY(deltaY);
     };
 
     const handleTouchEnd = () => {
         if (!isDragging) return;
         setIsDragging(false);
-        if (translateY > 100) { // Threshold
+        if (translateY > 100) {
             onDismiss();
         } else {
             setTranslateY(0);
@@ -68,7 +68,7 @@ const Panel: React.FC<PanelProps> = ({ id, title, children, headerActions }) => 
     if (!isRendered) return null;
 
     return (
-        <div 
+        <div
             className={`fixed inset-0 bg-bg-primary z-50 flex flex-col ${isVisible ? 'animate-slideInUp' : 'animate-slideOutDown'}`}
             onAnimationEnd={handleAnimationEnd}
             style={style}
@@ -76,15 +76,18 @@ const Panel: React.FC<PanelProps> = ({ id, title, children, headerActions }) => 
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
         >
-            <header 
-                className="panel-header flex items-center justify-between px-4 pb-4 bg-gradient-to-l from-primary to-primary-light text-white shadow-md shrink-0"
-                style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top, 0rem))' }}
+            <header
+                className="panel-header flex items-center justify-between px-4 pb-4 text-white shadow-lg shrink-0"
+                style={{
+                    paddingTop: 'calc(1rem + env(safe-area-inset-top, 0rem))',
+                    background: `linear-gradient(135deg, var(--primary-dark), var(--primary))`,
+                }}
             >
                 <h2 className="text-xl font-bold">{title}</h2>
                 <div className="flex items-center gap-1">
                     {headerActions}
-                    <button onClick={() => actions.openPanel(null)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
-                        <i className="fas fa-times text-xl"></i>
+                    <button onClick={() => actions.openPanel(null)} className="w-8 h-8 flex items-center justify-center hover:bg-white/15 rounded-full transition-colors">
+                        <i className="fas fa-times text-lg"></i>
                     </button>
                 </div>
             </header>

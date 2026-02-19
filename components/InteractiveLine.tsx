@@ -14,6 +14,7 @@ interface InteractiveLineProps {
 /**
  * مكون السطر التفاعلي
  * يتيح النقر المطول على سطور الآيات لفتح قائمة الخيارات
+ * التتبع الدقيق يتم عبر VerseGlyphSegment داخل children
  */
 const InteractiveLine: React.FC<InteractiveLineProps> = ({
     children,
@@ -32,11 +33,9 @@ const InteractiveLine: React.FC<InteractiveLineProps> = ({
     const getVerseForLine = (): Verse | null => {
         if (!pageVerses || !state.wordGlyphData || !firstWordId) return null;
 
-        // البحث عن الآية التي تحتوي على الكلمة الأولى في السطر
         for (const [key, wordInfo] of Object.entries(state.wordGlyphData)) {
             if (wordInfo.id === firstWordId) {
                 const [chapterId, verseNum] = key.split(':').map(Number);
-                // البحث عن الآية في بيانات الصفحة
                 const verse = pageVerses.find(v =>
                     v.chapter_id === chapterId && v.verse_number === verseNum
                 );
@@ -55,13 +54,12 @@ const InteractiveLine: React.FC<InteractiveLineProps> = ({
         longPressTimer.current = setTimeout(() => {
             const verse = getVerseForLine();
             if (verse) {
-                // اهتزاز لتأكيد التفعيل
                 try { navigator.vibrate(30); } catch (e) { }
                 actions.selectAyah(verse);
                 isLongPressTriggered.current = true;
             }
             longPressTimer.current = null;
-        }, 400); // 400ms للنقر المطول
+        }, 400);
     };
 
     const handlePressMove = (e: React.MouseEvent | React.TouchEvent) => {
@@ -71,7 +69,6 @@ const InteractiveLine: React.FC<InteractiveLineProps> = ({
             const dx = Math.abs(clientX - pressStartPos.current.x);
             const dy = Math.abs(clientY - pressStartPos.current.y);
 
-            // إلغاء النقر المطول إذا تحرك المستخدم كثيراً
             if (dx > 15 || dy > 15) {
                 clearTimeout(longPressTimer.current);
                 longPressTimer.current = null;
@@ -87,17 +84,11 @@ const InteractiveLine: React.FC<InteractiveLineProps> = ({
         }
         pressStartPos.current = null;
 
-        // منع الأحداث الافتراضية إذا تم تفعيل النقر المطول
         if (isLongPressTriggered.current) {
             e.preventDefault();
             e.stopPropagation();
         }
     };
-
-    // التحقق مما إذا كان السطر يتضمن الآية قيد التشغيل
-    const currentPlayingVerseKey = state.audioQueue[state.currentAudioIndex]?.verseKey;
-    const verse = getVerseForLine();
-    const isPlaying = state.isPlaying && verse && currentPlayingVerseKey === verse.verse_key;
 
     return (
         <div
@@ -107,7 +98,6 @@ const InteractiveLine: React.FC<InteractiveLineProps> = ({
                 transition-all duration-200
                 hover:bg-primary/5 active:bg-primary/10
                 rounded-lg
-                ${isPlaying ? 'bg-emerald-500/20 rounded-lg' : ''}
             `}
             onMouseDown={handlePressStart}
             onMouseUp={handlePressEnd}

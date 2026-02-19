@@ -286,8 +286,8 @@ const AIAssistant: React.FC = () => {
     const isAudioPanelOpen = activePanel === Panel.Audio;
     // FAB position at bottom - above the bottom nav
     const fabBottomPosition = isAudioPanelOpen
-        ? 'calc(15rem + env(safe-area-inset-bottom, 0rem))'
-        : 'calc(7rem + env(safe-area-inset-bottom, 0rem))';
+        ? 'calc(17rem + env(safe-area-inset-bottom, 0rem))'
+        : 'calc(9rem + env(safe-area-inset-bottom, 0rem))';
 
 
 
