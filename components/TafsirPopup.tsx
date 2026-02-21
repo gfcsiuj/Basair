@@ -7,7 +7,7 @@ const TafsirPopup: React.FC = () => {
 
     const isVisible = showTafsir && !!selectedAyah;
     const [isRendered, setIsRendered] = useState(isVisible);
-    
+
     // Swipe to dismiss state
     const [translateY, setTranslateY] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
@@ -73,7 +73,7 @@ const TafsirPopup: React.FC = () => {
 
 
     if (!isRendered) return null;
-    
+
     const tafsirName = tafsirs.find(t => t.id === state.selectedTafsirId)?.name || 'التفسير';
     const translationName = translations.find(t => t.id === state.selectedTranslationId)?.author_name || 'الترجمة';
 
@@ -82,7 +82,7 @@ const TafsirPopup: React.FC = () => {
 
     return (
         <div className={`fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 ${isVisible ? 'animate-fadeIn' : 'animate-fadeOut'}`} onClick={closeModal}>
-            <div 
+            <div
                 className={`bg-bg-primary rounded-xl max-w-2xl w-full max-h-[80vh] flex flex-col shadow-xl touch-none ${isVisible ? 'animate-scaleIn' : 'animate-scaleOut'}`}
                 onClick={e => e.stopPropagation()}
                 onAnimationEnd={handleAnimationEnd}
@@ -102,17 +102,17 @@ const TafsirPopup: React.FC = () => {
                         <h4 className="font-bold mb-2 text-primary">الآية:</h4>
                         <p className="font-arabic text-xl bg-bg-secondary p-3 rounded-md">{selectedAyah?.text_uthmani}</p>
                     </div>
-                     <div className="mb-4">
+                    <div className="mb-4">
                         <div className="flex justify-between items-center mb-2">
-                             <h4 className="font-bold text-primary">{tafsirName}:</h4>
-                             <button onClick={askAItoCompare} className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-md hover:bg-primary/20 transition-colors">
+                            <h4 className="font-bold text-primary">{tafsirName}:</h4>
+                            <button onClick={askAItoCompare} className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-md hover:bg-primary/20 transition-colors">
                                 <i className="fas fa-robot mr-1"></i>
                                 قارن التفاسير
-                             </button>
+                            </button>
                         </div>
                         <p className="text-text-primary leading-relaxed">{tafsirText}</p>
                     </div>
-                     <div>
+                    <div>
                         <h4 className="font-bold mb-2 text-primary">الترجمة ({translationName}):</h4>
                         <p className="text-text-primary leading-relaxed text-left" dir="ltr">{translationText}</p>
                     </div>
