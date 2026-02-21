@@ -1,4 +1,4 @@
-const CACHE_NAME = 'basaier-cache-v3'; // Incremented version to force update
+const CACHE_NAME = 'basaier-cache-v4'; // Incremented version to force update
 const urlsToCache = [
   '/',
   '/index.html',
@@ -9,7 +9,6 @@ const urlsToCache = [
   '/qpc-v4.json', // Cache the large JSON file
   '/qpc-v4-tajweed-15-lines.db', // Cache the DB file
   '/sql-wasm.wasm', // Cache the WASM file
-  '/quran-common.ttf'
 ];
 
 self.addEventListener('install', (event) => {
