@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useMemo, useState } from 'react';
+import React, { useRef, useEffect, useMemo } from 'react';
 import { Verse, Word } from '../types';
 import { useApp } from '../hooks/useApp';
 
@@ -10,7 +10,7 @@ const Ayah: React.FC<AyahProps> = ({ verse }) => {
     const { state, actions } = useApp();
     const { font } = state;
     const ayahRef = useRef<HTMLSpanElement>(null);
-    const [showTranslation, setShowTranslation] = useState(false);
+
 
     const isPlaying = state.isPlaying && state.audioQueue[state.currentAudioIndex]?.verseKey === verse.verse_key;
 
@@ -20,13 +20,10 @@ const Ayah: React.FC<AyahProps> = ({ verse }) => {
         return Math.min(100, (state.audioCurrentTime / state.audioDuration) * 100);
     }, [isPlaying, state.audioCurrentTime, state.audioDuration]);
 
-    // Auto-scroll to playing verse & show translation
+    // Auto-scroll to playing verse
     useEffect(() => {
         if (isPlaying && ayahRef.current) {
             ayahRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            setShowTranslation(true);
-        } else {
-            setShowTranslation(false);
         }
     }, [isPlaying]);
 
@@ -96,16 +93,7 @@ const Ayah: React.FC<AyahProps> = ({ verse }) => {
         onTouchEnd: handleAyahInteractionEnd,
     };
 
-    // Get surah name for the current verse
-    const surahName = useMemo(() => {
-        return state.surahs.find(s => s.id === verse.chapter_id)?.name_arabic || '';
-    }, [state.surahs, verse.chapter_id]);
 
-    // Translation text (cleaned of HTML tags)
-    const translationText = useMemo(() => {
-        if (!verse.translations || verse.translations.length === 0) return null;
-        return verse.translations[0].text.replace(/<sup[^>]*>.*?<\/sup>/g, '').replace(/<[^>]*>/g, '');
-    }, [verse.translations]);
 
     // Render the verse text content
     const renderVerseContent = () => {
@@ -157,16 +145,7 @@ const Ayah: React.FC<AyahProps> = ({ verse }) => {
 
             {renderVerseContent()}
 
-            {/* Translation tooltip below playing verse */}
-            {isPlaying && showTranslation && translationText && (
-                <span className="verse-translation-popup">
-                    <span className="verse-translation-label">
-                        <i className="fas fa-language" style={{ fontSize: '10px', marginLeft: '4px' }}></i>
-                        {surahName} : {verseNumberArabic}
-                    </span>
-                    <span className="verse-translation-text">{translationText}</span>
-                </span>
-            )}
+
         </span>
     );
 };

@@ -28,12 +28,7 @@ const VerseGlyphSegment = React.memo(({ verseKey, text, pageVerses }: { verseKey
         ? Math.min(100, (state.audioCurrentTime / state.audioDuration) * 100)
         : 0;
 
-    // Translation text for playing verse
-    const verse = isPlaying ? pageVerses?.find(v => v.verse_key === verseKey) : null;
-    const surahName = verse ? state.surahs.find(s => s.id === verse.chapter_id)?.name_arabic : '';
-    const translationText = verse?.translations?.[0]?.text
-        ?.replace(/<sup[^>]*>.*?<\/sup>/g, '')
-        ?.replace(/<[^>]*>/g, '') || null;
+
 
     return (
         <span
@@ -49,16 +44,7 @@ const VerseGlyphSegment = React.memo(({ verseKey, text, pageVerses }: { verseKey
                     style={{ width: `${progress}%` }}
                 />
             )}
-            {/* Translation popup */}
-            {isPlaying && translationText && (
-                <span className="verse-translation-popup">
-                    <span className="verse-translation-label">
-                        <i className="fas fa-language" style={{ fontSize: '10px', marginLeft: '4px' }}></i>
-                        {surahName} : {verse ? new Intl.NumberFormat('ar-EG').format(verse.verse_number) : ''}
-                    </span>
-                    <span className="verse-translation-text">{translationText}</span>
-                </span>
-            )}
+
         </span>
     );
 });
@@ -103,6 +89,8 @@ const QuranPage: React.FC<{
     const [responsiveFontSize, setResponsiveFontSize] = useState(getResponsiveFontSize());
     const [isLandscape, setIsLandscape] = useState(window.innerWidth > window.innerHeight);
     const [linesForPage, setLinesForPage] = useState<LineData[]>([]);
+    // Font readiness gate — prevents flash of unstyled text on page flip
+    const [isFontReady, setIsFontReady] = useState(font !== 'qpc-v1');
 
     // ... (resize effect omitted as it doesn't need changes)
 
@@ -133,10 +121,48 @@ const QuranPage: React.FC<{
         }
 
         return () => {
-            // Clean up style element when component unmounts
-            if (styleEl && styleEl.parentNode) {
-                styleEl.parentNode.removeChild(styleEl);
+            // Do NOT remove the style element on unmount.
+            // Fonts are cached by the browser and reused, so keeping the @font-face
+            // declaration alive avoids re-fetching the font file on every page flip.
+        };
+    }, [targetPage, font]);
+
+    // Wait for the page-specific font to be loaded before making content visible
+    useEffect(() => {
+        if (font !== 'qpc-v1' || targetPage <= 0) {
+            setIsFontReady(true);
+            return;
+        }
+
+        setIsFontReady(false);
+        const fontSpec = `1em QuranPageFontV2-${targetPage}`;
+
+        // Check immediately — if font was preloaded it may already be ready
+        if (document.fonts.check(fontSpec)) {
+            setIsFontReady(true);
+            return;
+        }
+
+        // Wait for document.fonts.ready then poll with rAF until confirmed
+        let cancelled = false;
+        let rafId: number;
+
+        const poll = () => {
+            if (cancelled) return;
+            if (document.fonts.check(fontSpec)) {
+                setIsFontReady(true);
+            } else {
+                rafId = requestAnimationFrame(poll);
             }
+        };
+
+        document.fonts.ready.then(() => {
+            if (!cancelled) poll();
+        });
+
+        return () => {
+            cancelled = true;
+            if (rafId) cancelAnimationFrame(rafId);
         };
     }, [targetPage, font]);
 
@@ -310,7 +336,7 @@ const QuranPage: React.FC<{
     };
 
     return (
-        <div className="w-full animate-pageTransition">
+        <div className="w-full animate-pageTransition" style={{ opacity: isFontReady ? 1 : 0 }}>
             <PageJuzHeader />
             <div style={pageStyle}>
                 {state.isVerseByVerseLayout ? (
