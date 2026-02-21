@@ -227,6 +227,7 @@ const App: React.FC = () => {
         notificationPermission: 'default',
         areNotificationsEnabled: JSON.parse(localStorage.getItem('areNotificationsEnabled') || 'false'),
         customThemeColor: localStorage.getItem('customThemeColor') || '#10b981',
+        lastRead: JSON.parse(localStorage.getItem('lastRead') || 'null'),
     });
 
     // --- API & Data Loading ---

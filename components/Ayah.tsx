@@ -13,6 +13,8 @@ const Ayah: React.FC<AyahProps> = ({ verse }) => {
 
 
     const isPlaying = state.isPlaying && state.audioQueue[state.currentAudioIndex]?.verseKey === verse.verse_key;
+    const isSelected = state.selectedAyah?.verse_key === verse.verse_key;
+    const isLastRead = state.lastRead?.verseKey === verse.verse_key;
 
     // Calculate progress percentage based on audio time
     const progress = useMemo(() => {
@@ -128,12 +130,20 @@ const Ayah: React.FC<AyahProps> = ({ verse }) => {
         );
     };
 
+    // Build dynamic class for highlighting
+    let highlightClass = '';
+    if (isSelected) {
+        highlightClass = 'verse-selected';
+    } else if (isLastRead) {
+        highlightClass = 'verse-last-read';
+    }
+
     return (
         <span
             ref={ayahRef}
             {...ayahEventHandlers}
             data-verse-key={verse.verse_key}
-            className={`ayah-container inline relative cursor-pointer transition-all duration-300 ${isPlaying ? 'verse-tracking-active' : ''}`}
+            className={`ayah-container inline relative cursor-pointer transition-all duration-300 ${isPlaying ? 'verse-tracking-active' : ''} ${highlightClass}`}
         >
             {/* Progress underline when playing */}
             {isPlaying && (

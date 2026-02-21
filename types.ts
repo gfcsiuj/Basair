@@ -229,6 +229,7 @@ export interface AppState {
     notificationPermission: NotificationPermission;
     customThemeColor: string;
     areNotificationsEnabled: boolean;
+    lastRead: { verseKey: string; pageNumber: number; text: string; surahName: string } | null;
 }
 
 export type DownloadableItem = {

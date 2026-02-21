@@ -16,6 +16,7 @@ const VerseGlyphSegment = React.memo(({ verseKey, text, pageVerses }: { verseKey
     const ref = useRef<HTMLSpanElement>(null);
 
     const isPlaying = state.isPlaying && state.audioQueue[state.currentAudioIndex]?.verseKey === verseKey;
+    const isLastRead = state.lastRead?.verseKey === verseKey;
 
     // Auto-scroll to the playing verse segment
     useEffect(() => {
@@ -35,7 +36,7 @@ const VerseGlyphSegment = React.memo(({ verseKey, text, pageVerses }: { verseKey
         <span
             ref={ref}
             data-verse-key={verseKey}
-            className={`verse-glyph-segment ${isPlaying ? 'verse-glyph-active' : ''}`}
+            className={`verse-glyph-segment ${isPlaying ? 'verse-glyph-active' : ''} ${isLastRead ? 'verse-last-read' : ''}`}
         >
             {text}
             {/* Progress bar */}
