@@ -1,4 +1,4 @@
-const CACHE_NAME = 'basaier-cache-v4'; // Incremented version to force update
+const CACHE_NAME = 'basaier-cache-v5'; // Incremented version to force update
 const urlsToCache = [
   '/',
   '/index.html',
@@ -9,6 +9,7 @@ const urlsToCache = [
   '/qpc-v4.json', // Cache the large JSON file
   '/qpc-v4-tajweed-15-lines.db', // Cache the DB file
   '/sql-wasm.wasm', // Cache the WASM file
+  '/quran-common.ttf'
 ];
 
 self.addEventListener('install', (event) => {
@@ -16,7 +17,14 @@ self.addEventListener('install', (event) => {
     caches.open(CACHE_NAME)
       .then((cache) => {
         console.log('Opened cache and pre-caching critical assets');
-        return cache.addAll(urlsToCache);
+        // Cache each URL individually so one failure doesn't block others
+        return Promise.all(
+          urlsToCache.map((url) =>
+            cache.add(url).catch((err) => {
+              console.warn('Failed to cache ' + url + ':', err);
+            })
+          )
+        );
       })
   );
   self.skipWaiting(); // Activate worker immediately

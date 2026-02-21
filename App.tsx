@@ -585,7 +585,7 @@ const App: React.FC = () => {
                     fetch('/qpc-v4-tajweed-15-lines.db').then(res => res.arrayBuffer())
                 ]);
 
-                const SQL = await initSqlJs({ locateFile: file => `/${file}` });
+                const SQL = await initSqlJs({ locateFile: () => '/sql-wasm.wasm' });
                 const db = new SQL.Database(new Uint8Array(dbBuffer));
 
                 const processedApiReciters = recitationsData.recitations.map(reciter => ({
