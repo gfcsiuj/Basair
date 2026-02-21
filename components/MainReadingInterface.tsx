@@ -1,4 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { flushSync } from 'react-dom';
+import { renderedFontPages } from '../utils/fontPageTracker';
 import Header from './Header';
 import QuranPage from './QuranPage';
 import BottomNav from './BottomNav';
@@ -113,23 +115,18 @@ const MainReadingInterface: React.FC = () => {
         preloadFont(state.currentPage + 1);
     }, [state.currentPage, isDesktopView, state.isAutoScrolling, state.font]);
 
-    // Scroll to center page (current) on mount and after page change
+    // Set initial scroll position on mount so the current page is centered
     useEffect(() => {
         if (isDesktopView || state.isAutoScrolling) return;
         const container = swipeContainerRef.current;
         if (!container) return;
+        // Run on mount: scroll to center (current page slot)
+        const pageWidth = container.offsetWidth;
+        const hasPrev = state.currentPage > 1;
+        container.scrollLeft = hasPrev ? -pageWidth : 0;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // mount only
 
-        requestAnimationFrame(() => {
-            const pageWidth = container.offsetWidth;
-            const hasPrev = state.currentPage > 1;
-            if (hasPrev) {
-                container.scrollLeft = -pageWidth;
-            } else {
-                container.scrollLeft = 0;
-            }
-            isScrollingRef.current = false;
-        });
-    }, [state.currentPage, isDesktopView, state.isAutoScrolling]);
 
     // Handle scroll-snap end detection — uses pre-fetched data directly to avoid flash
     const handleSwipeScroll = useCallback(() => {
@@ -170,13 +167,29 @@ const MainReadingInterface: React.FC = () => {
             if (newPage !== null) {
                 isScrollingRef.current = true;
 
-                // Use pre-fetched data directly — NO loading flash
-                actions.setState(s => ({
-                    ...s,
-                    currentPage: newPage!,
-                    pageData: { left: null, right: newPageData || s.pageData.right },
-                    currentAudioIndex: 0,
-                }));
+                // KEY: Mark this page as CSS-rendered BEFORE flushSync.
+                // The adjacent slot was showing this page correctly with CSS font.
+                // This allows QuranPage's sync isFontReady check to return true
+                // immediately on first render after flushSync — NO white flash.
+                renderedFontPages.add(newPage!);
+
+                // flushSync: React processes state update synchronously and updates the DOM
+                // BEFORE this function returns. We then immediately correct the scroll
+                // position in the same event loop tick — the browser never renders the
+                // intermediate state where the wrong slot was visible at the swipe position.
+                flushSync(() => {
+                    actions.setState(s => ({
+                        ...s,
+                        currentPage: newPage!,
+                        pageData: { left: null, right: newPageData || s.pageData.right },
+                        currentAudioIndex: 0,
+                    }));
+                });
+
+                // Immediately reset scroll to center slot (no rAF delay = no wrong-slot frame)
+                const newHasPrev = newPage! > 1;
+                container.scrollLeft = newHasPrev ? -pageWidth : 0;
+                isScrollingRef.current = false;
 
                 // Update localStorage and reading log
                 localStorage.setItem('lastPage', String(newPage));

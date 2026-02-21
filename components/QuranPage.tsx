@@ -5,6 +5,7 @@ import SurahHeader from './SurahHeader';
 import InteractiveLine from './InteractiveLine';
 import VerseByVersePage from './VerseByVersePage';
 import { Verse } from '../types';
+import { renderedFontPages } from '../utils/fontPageTracker';
 
 /**
  * VerseGlyphSegment - wraps a verse's glyph characters in a trackable inline span.
@@ -88,9 +89,47 @@ const QuranPage: React.FC<{
 
     const [responsiveFontSize, setResponsiveFontSize] = useState(getResponsiveFontSize());
     const [isLandscape, setIsLandscape] = useState(window.innerWidth > window.innerHeight);
-    const [linesForPage, setLinesForPage] = useState<LineData[]>([]);
-    // Font readiness gate — prevents flash of unstyled text on page flip
-    const [isFontReady, setIsFontReady] = useState(font !== 'qpc-v1');
+
+    // Query line layout data from SQLite synchronously during render.
+    // useMemo ensures this only runs when layoutDb or targetPage changes.
+    // Synchronous = linesForPage is ALWAYS ready on first render, no blank-content flash.
+    const linesForPage = useMemo<LineData[]>(() => {
+        if (!layoutDb || !targetPage) return [];
+        try {
+            const stmt = layoutDb.prepare(`
+                SELECT line_number, line_type, is_centered, first_word_id, last_word_id, surah_number 
+                FROM pages 
+                WHERE page_number = :page
+                ORDER BY line_number ASC
+            `);
+            stmt.bind({ ':page': targetPage });
+            const lines: LineData[] = [];
+            while (stmt.step()) {
+                lines.push(stmt.getAsObject() as unknown as LineData);
+            }
+            stmt.free();
+            return lines;
+        } catch (err) {
+            console.error(`Failed to query page ${targetPage}:`, err);
+            return [];
+        }
+    }, [layoutDb, targetPage]);
+
+    // --- Fix A: synchronous font check in render ---
+    // THREE ways isFontReady can be true synchronously:
+    // 1. Not QPC font
+    // 2. renderedFontPages.has(targetPage): MainReadingInterface marked this page
+    //    as CSS-rendered BEFORE calling flushSync — so on first render of new targetPage
+    //    this is already true → ZERO white frames (key fix for OTS-broken fonts)
+    // 3. document.fonts.check(): fast path if FontFace API happens to work
+    const isFontCheckedSync = font !== 'qpc-v1'
+        || targetPage <= 0
+        || renderedFontPages.has(targetPage)
+        || document.fonts.check(`1em QuranPageFontV2-${targetPage}`);
+
+    // fontReadyPage handles async loading for first-time page loads not in renderedFontPages
+    const [fontReadyPage, setFontReadyPage] = useState<number | null>(null);
+    const isFontReady = isFontCheckedSync || fontReadyPage === targetPage;
 
     // ... (resize effect omitted as it doesn't need changes)
 
@@ -127,68 +166,52 @@ const QuranPage: React.FC<{
         };
     }, [targetPage, font]);
 
-    // Wait for the page-specific font to be loaded before making content visible
+    // Load the page-specific font and track when it's ready.
+    // Uses document.fonts.load() which resolves only when the font binary is fetched.
+    // We never explicitly set fontReadyPage to null — it stays at the last confirmed page,
+    // so isFontReady goes false synchronously on targetPage change, then back to true
+    // only after the new font is confirmed loaded.
     useEffect(() => {
         if (font !== 'qpc-v1' || targetPage <= 0) {
-            setIsFontReady(true);
+            renderedFontPages.add(targetPage);
+            setFontReadyPage(targetPage);
             return;
         }
 
-        setIsFontReady(false);
-        const fontSpec = `1em QuranPageFontV2-${targetPage}`;
+        const fontFamily = `QuranPageFontV2-${targetPage}`;
+        const fontSpec = `1em ${fontFamily}`;
 
-        // Check immediately — if font was preloaded it may already be ready
+        // Fast path: already tracked as rendered (e.g. was an adjacent page)
+        if (renderedFontPages.has(targetPage)) {
+            setFontReadyPage(targetPage);
+            return;
+        }
+
         if (document.fonts.check(fontSpec)) {
-            setIsFontReady(true);
+            renderedFontPages.add(targetPage);
+            setFontReadyPage(targetPage);
             return;
         }
 
-        // Wait for document.fonts.ready then poll with rAF until confirmed
         let cancelled = false;
-        let rafId: number;
 
-        const poll = () => {
-            if (cancelled) return;
-            if (document.fonts.check(fontSpec)) {
-                setIsFontReady(true);
-            } else {
-                rafId = requestAnimationFrame(poll);
+        const resolve = () => {
+            if (!cancelled) {
+                // Mark as rendered — even OTS failure means CSS showed it correctly
+                renderedFontPages.add(targetPage);
+                setFontReadyPage(targetPage);
             }
         };
 
-        document.fonts.ready.then(() => {
-            if (!cancelled) poll();
-        });
+        // document.fonts.load() fails with OTS for SVG-format QPC fonts,
+        // but .catch(resolve) ensures we still show the page (CSS renders it fine)
+        document.fonts.load(fontSpec).then(resolve).catch(resolve);
 
-        return () => {
-            cancelled = true;
-            if (rafId) cancelAnimationFrame(rafId);
-        };
+        return () => { cancelled = true; };
     }, [targetPage, font]);
 
-    // Effect to query line data from DB
-    useEffect(() => {
-        if (layoutDb && targetPage) {
-            try {
-                const stmt = layoutDb.prepare(`
-                    SELECT line_number, line_type, is_centered, first_word_id, last_word_id, surah_number 
-                    FROM pages 
-                    WHERE page_number = :page
-                    ORDER BY line_number ASC
-                `);
-                stmt.bind({ ':page': targetPage });
-                const lines: LineData[] = [];
-                while (stmt.step()) {
-                    lines.push(stmt.getAsObject() as unknown as LineData);
-                }
-                stmt.free();
-                setLinesForPage(lines);
-            } catch (err) {
-                console.error(`Failed to query page ${targetPage}:`, err);
-                setLinesForPage([]);
-            }
-        }
-    }, [layoutDb, targetPage]);
+
+
 
     // Memoize word glyphs into a Map for fast O(1) lookups
     const memoizedWordGlyphsById = useMemo(() => {
@@ -336,7 +359,7 @@ const QuranPage: React.FC<{
     };
 
     return (
-        <div className="w-full animate-pageTransition" style={{ opacity: isFontReady ? 1 : 0 }}>
+        <div className="w-full" style={{ opacity: isFontReady ? 1 : 0 }}>
             <PageJuzHeader />
             <div style={pageStyle}>
                 {state.isVerseByVerseLayout ? (
