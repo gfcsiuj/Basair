@@ -8,7 +8,9 @@ const AyahContextMenu: React.FC = () => {
     const { selectedAyah } = state;
     const [showShareOptions, setShowShareOptions] = useState(false);
     const [isListeningAudio, setIsListeningAudio] = useState(false);
+    const [activeWordIndex, setActiveWordIndex] = useState<number | null>(null);
     const standaloneAudioRef = useRef<HTMLAudioElement | null>(null);
+    const wordAudioRef = useRef<HTMLAudioElement | null>(null);
 
     // Animation state
     const isVisible = !!selectedAyah;
@@ -91,6 +93,7 @@ const AyahContextMenu: React.FC = () => {
             setIsRendered(true);
             setShowShareOptions(false);
             setTranslateY(0);
+            setActiveWordIndex(null);
         } else {
             // Stop standalone audio when context menu closes
             if (standaloneAudioRef.current) {
@@ -265,6 +268,35 @@ const AyahContextMenu: React.FC = () => {
             .join('');
     }
 
+    // Build word list for clickable word-by-word audio
+    const wordsList = selectedAyah?.words?.filter(w => w.char_type_name === 'word') || [];
+
+    // Handle tapping a word: highlight + play audio
+    const handleWordTap = (wordIndex: number, word: any) => {
+        setActiveWordIndex(wordIndex);
+        // Stop any previous word audio
+        if (wordAudioRef.current) {
+            wordAudioRef.current.pause();
+            wordAudioRef.current = null;
+        }
+        if (word.audio_url) {
+            const audio = new Audio(`${AUDIO_BASE}${word.audio_url}`);
+            wordAudioRef.current = audio;
+            audio.onended = () => {
+                wordAudioRef.current = null;
+                // Keep highlight for a moment then clear
+                setTimeout(() => setActiveWordIndex(null), 400);
+            };
+            audio.onerror = () => {
+                wordAudioRef.current = null;
+                setActiveWordIndex(null);
+            };
+            audio.play().catch(() => setActiveWordIndex(null));
+        } else {
+            setTimeout(() => setActiveWordIndex(null), 600);
+        }
+    };
+
     const renderContent = () => {
         if (showShareOptions) {
             return (
@@ -314,7 +346,21 @@ const AyahContextMenu: React.FC = () => {
                     )}
                     {/* Verse preview card */}
                     <div className="mb-4 bg-bg-secondary rounded-2xl p-4 border border-border/50">
-                        <p className="font-arabic text-lg text-center leading-loose" style={{ ...fontStyle, wordWrap: 'break-word', overflowWrap: 'break-word', whiteSpace: 'pre-wrap', display: 'block', width: '100%' }}>{ayahText}</p>
+                        <p className="font-arabic text-lg text-center leading-loose" dir="rtl" style={{ ...fontStyle, wordWrap: 'break-word', overflowWrap: 'break-word', whiteSpace: 'pre-wrap', display: 'block', width: '100%' }}>
+                            {wordsList.length > 0 ? (
+                                wordsList.map((word, idx) => (
+                                    <span
+                                        key={idx}
+                                        className={`word-tap-target ${activeWordIndex === idx ? 'word-highlight-active' : ''}`}
+                                        onClick={() => handleWordTap(idx, word)}
+                                    >
+                                        {word.text_uthmani}
+                                    </span>
+                                ))
+                            ) : (
+                                ayahText
+                            )}
+                        </p>
                         <div className="flex items-center justify-center gap-2 mt-2">
                             <span className="text-xs px-3 py-1 bg-primary/10 text-primary rounded-full font-medium">
                                 {`سورة ${surah?.name_arabic}`}

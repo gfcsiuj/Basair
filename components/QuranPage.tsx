@@ -359,10 +359,12 @@ const QuranPage: React.FC<{
         );
     };
 
+    const isCenteredPage = targetPage === 1 || targetPage === 2;
+
     return (
         <div className="w-full" style={{ opacity: isFontReady ? 1 : 0 }}>
             <PageJuzHeader />
-            <div style={pageStyle}>
+            <div className={isCenteredPage ? 'quran-page-centered' : ''} style={pageStyle}>
                 {state.isVerseByVerseLayout ? (
                     <VerseByVersePage pageVerses={pageVerses} />
                 ) : (

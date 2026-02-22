@@ -106,6 +106,49 @@ body {
     font-display: swap;
 }
 
+@font-face {
+    font-family: 'surah-names';
+    src: url('/surah_names.ttf') format('truetype'),
+        url('https://static-cdn.tarteel.ai/qul/fonts/surah_names_v4/surah_names.ttf') format('truetype');
+    font-display: swap;
+    font-variant-ligatures: common-ligatures;
+}
+
+/* ====== Centered Pages (1 & 2) ====== */
+.quran-page-centered {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: calc(100vh - 120px);
+    padding: 1rem 0;
+}
+
+.quran-page-centered .quran-line {
+    text-align: center !important;
+    text-align-last: center !important;
+}
+
+/* ====== Word-by-Word Highlight in Context Menu ====== */
+.word-tap-target {
+    display: inline;
+    padding: 2px 4px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.2s ease, color 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.word-tap-target:active {
+    transform: scale(0.96);
+}
+
+.word-highlight-active {
+    background-color: rgba(59, 130, 246, 0.25);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+    border-radius: 6px;
+}
+
 /* ====== Glassmorphism ====== */
 .glass-panel {
     background: rgba(255, 255, 255, 0.75);
