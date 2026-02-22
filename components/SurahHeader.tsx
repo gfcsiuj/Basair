@@ -43,59 +43,62 @@ const SurahHeader: React.FC<SurahHeaderProps> = ({ surah }) => {
     const surahNameChar = getSurahNameChar(surah.id);
 
     return (
-        <div className="surah-header-container mb-2 w-full relative">
-            {/* Decorative frame image */}
-            <div className="w-full relative flex justify-center items-center">
+        <div className="surah-header-container mb-2 w-full relative flex items-center justify-center">
+            {/* 
+              We use a relative container that shrinks/grows with the image. 
+              The text is positioned absolutely inside this container so it scales identically.
+            */}
+            <div className="relative w-full max-w-[95%]">
                 <img
                     src="/surah_hedar.svg"
                     alt="Surah Header Frame"
-                    className="w-full h-auto object-contain select-none pointer-events-none"
+                    className="w-full h-auto object-contain select-none pointer-events-none block"
                 />
-            </div>
 
-            {/* Surah name centered - positioned to look like part of the frame */}
-            <div
-                className="absolute inset-0 flex items-center justify-center"
-                style={{ marginTop: '-3px' }}
-            >
-                <span
-                    style={{
-                        fontSize: 'clamp(1.3rem, 5.5vw, 2rem)',
-                        fontFamily: "'surah-names'",
-                        lineHeight: 1,
-                        display: 'inline-block',
-                        fontWeight: 'normal',
-                        WebkitTextStroke: '0.24px currentColor',
-                    }}
+                {/* Surah name centered */}
+                <div
+                    className="absolute inset-0 flex items-center justify-center"
+                    style={{ paddingBottom: '2.5%' }}
                 >
-                    {surahNameChar}
-                </span>
-            </div>
+                    <span
+                        style={{
+                            fontSize: 'clamp(1.2rem, 5.5vw, 2.2rem)',
+                            fontFamily: "'surah-names'",
+                            lineHeight: 1,
+                            display: 'inline-block',
+                            fontWeight: 'normal',
+                            WebkitTextStroke: '0.24px currentColor',
+                        }}
+                    >
+                        {surahNameChar}
+                    </span>
+                </div>
 
-            {/* عدد الآيات - في الدائرة اليسرى */}
-            <div
-                className="absolute inset-y-0 flex items-center justify-center"
-                style={{ left: '19%', width: '9%' }}
-            >
-                <span
-                    className="text-primary font-extrabold text-center leading-tight"
-                    style={{ fontSize: '7px', fontFamily: 'Rubik, sans-serif' }}
+                {/* عدد الآيات - في الدائرة اليسرى */}
+                <div
+                    className="absolute inset-y-0 flex items-center justify-center"
+                    style={{ left: '19.5%', width: '9%' }}
                 >
-                    {surah.verses_count}<br />آية
-                </span>
-            </div>
+                    <span
+                        className="text-primary font-extrabold text-center leading-tight"
+                        style={{ fontSize: 'clamp(0.4rem, 1vw, 0.7rem)', fontFamily: 'Rubik, sans-serif' }}
+                    >
+                        {surah.verses_count}<br />آية
+                    </span>
+                </div>
 
-            {/* مكية/مدنية - في الدائرة اليمنى */}
-            <div
-                className="absolute inset-y-0 flex items-center justify-center"
-                style={{ right: '19%', width: '9%' }}
-            >
-                <span
-                    className="text-primary font-extrabold text-center leading-tight"
-                    style={{ fontSize: '7px', fontFamily: 'Rubik, sans-serif' }}
+                {/* مكية/مدنية - في الدائرة اليمنى */}
+                <div
+                    className="absolute inset-y-0 flex items-center justify-center"
+                    style={{ right: '19.5%', width: '9%' }}
                 >
-                    {isMakki ? 'مكية' : 'مدنية'}
-                </span>
+                    <span
+                        className="text-primary font-extrabold text-center leading-tight"
+                        style={{ fontSize: 'clamp(0.4rem, 1vw, 0.7rem)', fontFamily: 'Rubik, sans-serif' }}
+                    >
+                        {isMakki ? 'مكية' : 'مدنية'}
+                    </span>
+                </div>
             </div>
         </div>
     );
