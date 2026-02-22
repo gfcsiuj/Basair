@@ -23,6 +23,8 @@ export enum Panel {
     PrayerTimes = 'prayer_times',
     OfflineManager = 'offline_manager',
     Audio = 'audio',
+    Hadith = 'hadith',
+    Achievements = 'achievements',
 }
 
 export enum RepeatMode {

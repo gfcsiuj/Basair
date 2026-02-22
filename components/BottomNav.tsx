@@ -4,6 +4,7 @@ import { Panel } from '../types';
 import AudioControlBar from './AudioControlBar';
 import { AutoScrollIcon } from './SvgDecorations';
 import { TOTAL_PAGES, API_BASE } from '../constants';
+import { showToast } from './ToastContainer';
 
 const NavItem: React.FC<{ icon: string; label: string; isActive: boolean; onClick: () => void; customIcon?: React.ReactNode }> = ({ icon, label, isActive, onClick, customIcon }) => (
     <button onClick={onClick} className={`nav-item flex flex-col items-center justify-center p-1 transition-all duration-200 w-full relative ${isActive ? 'text-primary' : 'text-text-secondary hover:text-primary'}`}>
@@ -51,7 +52,7 @@ const PageSliderBar: React.FC = () => {
                 {isDragging && (
                     <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-primary text-white text-xs rounded-lg px-3 py-1.5 whitespace-nowrap shadow-lg z-50 animate-fadeIn">
                         <div className="font-bold">{tooltipSurah?.name_arabic || '...'}</div>
-                        <div className="text-[10px] opacity-80 text-center">ص {tooltipPage} • جزء {Math.ceil(tooltipPage / 20.13) || 1}</div>
+                        <div className="text-[10px] opacity-80 text-center">{'\u0635'} {tooltipPage} {'\u2022'} {'\u062c\u0632\u0621'} {juzNumber || Math.ceil(tooltipPage / 20)}</div>
                         <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-primary"></div>
                     </div>
                 )}
@@ -151,39 +152,62 @@ const BottomNav: React.FC = () => {
 
         return (
             <div
-                className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4 animate-fadeIn"
+                className="fixed inset-0 bg-black/60 backdrop-blur-md z-[60] flex items-center justify-center p-5 animate-fadeIn"
                 onClick={() => setShowLastReadPopup(false)}
             >
                 <div
-                    className="bg-bg-primary rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden animate-scaleIn border border-border"
+                    className="relative bg-bg-primary rounded-[2rem] w-full max-w-sm shadow-2xl overflow-hidden animate-scaleIn border border-border/50"
                     onClick={e => e.stopPropagation()}
                 >
-                    <div className="p-4 border-b border-border bg-bg-secondary flex justify-between items-center">
-                        <h3 className="font-bold text-primary flex items-center gap-2">
-                            <i className="fas fa-bookmark"></i>
-                            آخر قراءة
-                        </h3>
-                        <button onClick={() => setShowLastReadPopup(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-bg-tertiary text-text-secondary hover:text-red-500 hover:bg-red-500/10 transition-colors">
-                            <i className="fas fa-times"></i>
+                    {/* Glowing Accent */}
+                    <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-primary/10 to-transparent pointer-events-none"></div>
+
+                    {/* Header */}
+                    <div className="relative p-6 pb-2 flex justify-between items-center">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20 shadow-sm">
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-text-primary text-lg leading-none">متابعة القراءة</h3>
+                                <p className="text-xs text-text-tertiary mt-1">آخر موضع توقفت عنده</p>
+                            </div>
+                        </div>
+                        <button onClick={() => setShowLastReadPopup(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-bg-secondary text-text-secondary hover:bg-bg-tertiary transition-colors active:scale-90 shadow-sm border border-border/50">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
                         </button>
                     </div>
-                    <div className="p-6 text-center cursor-pointer hover:bg-bg-secondary/50 transition-colors group" onClick={handleNavigateToLastRead}>
+
+                    {/* Content */}
+                    <div className="relative px-6 py-8 text-center cursor-pointer group" onClick={handleNavigateToLastRead}>
+                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-primary/5 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                         <p
-                            className="font-arabic text-2xl leading-loose mb-6 text-text-primary group-hover:text-primary transition-colors"
+                            className="font-arabic text-3xl leading-[2.2] mb-8 text-text-primary group-hover:text-primary transition-colors duration-300 relative z-10"
                             style={{ fontFamily: popupFontFamily }}
                         >
                             {popupText}
                         </p>
-                        <div className="inline-flex items-center justify-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium">
+                        <div className="inline-flex items-center justify-center gap-2 bg-bg-secondary text-text-secondary px-5 py-2.5 rounded-2xl text-sm font-bold border border-border/50 shadow-sm relative z-10">
+                            <svg className="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                            </svg>
                             سورة {state.lastRead.surahName}
-                            <span className="w-1.5 h-1.5 rounded-full bg-primary/50"></span>
+                            <span className="w-1.5 h-1.5 rounded-full bg-primary/40 mx-1"></span>
                             الآية {state.lastRead.verseKey.split(':')[1]}
                         </div>
                     </div>
-                    <div className="p-4 bg-bg-secondary border-t border-border flex justify-center">
-                        <button onClick={handleNavigateToLastRead} className="btn-primary w-full py-3 rounded-xl flex items-center justify-center gap-2 font-bold shadow-lg shadow-primary/30">
-                            الانتقال إلى الآية
-                            <i className="fas fa-arrow-left text-sm"></i>
+
+                    {/* Footer / Action */}
+                    <div className="p-5 bg-bg-secondary/50 border-t border-border mt-2">
+                        <button onClick={handleNavigateToLastRead} className="btn-primary w-full py-4 rounded-2xl flex items-center justify-center gap-3 font-bold shadow-xl shadow-primary/20 active:scale-[0.98] transition-all text-base">
+                            الانتقال إلى الموضع
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                            </svg>
                         </button>
                     </div>
                 </div>

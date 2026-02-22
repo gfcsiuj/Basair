@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useMemo } from 'react';
+import React, { useRef, useEffect, useMemo, useCallback } from 'react';
 import { Verse, Word } from '../types';
 import { useApp } from '../hooks/useApp';
 
@@ -34,6 +34,14 @@ const Ayah: React.FC<AyahProps> = ({ verse }) => {
     const isLongPressTriggered = useRef(false);
 
     const ayahLongPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // Cleanup timers on unmount to prevent memory leaks
+    useEffect(() => {
+        return () => {
+            if (wordLongPressTimer.current) clearTimeout(wordLongPressTimer.current);
+            if (ayahLongPressTimer.current) clearTimeout(ayahLongPressTimer.current);
+        };
+    }, []);
 
     const handlePressStart = (e: React.MouseEvent | React.TouchEvent, word: Word | { position: number }) => {
         e.stopPropagation();

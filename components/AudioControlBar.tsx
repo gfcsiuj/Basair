@@ -5,6 +5,7 @@ import { TOTAL_PAGES } from '../constants';
 
 const AudioControlBar: React.FC = () => {
     const { state, actions } = useApp();
+    const progress = state.audioDuration > 0 ? (state.audioCurrentTime / state.audioDuration) * 100 : 0;
     const { isPlaying, audioQueue, currentAudioIndex, surahs, audioCurrentTime, audioDuration, repeatMode, playbackRate, selectedReciterId } = state;
     const audioElRef = React.useRef<HTMLAudioElement | null>(null);
 
@@ -15,7 +16,6 @@ const AudioControlBar: React.FC = () => {
     const currentVerseKey = audioQueue[currentAudioIndex]?.verseKey;
     const [surahId, verseNum] = currentVerseKey?.split(':').map(Number) || [null, null];
     const currentSurah = surahs.find(s => s.id === surahId);
-    const progress = audioDuration > 0 ? (audioCurrentTime / audioDuration) * 100 : 0;
     const currentReciterName = state.reciters.find(r => r.id === selectedReciterId)?.reciter_name || '...';
 
     const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {

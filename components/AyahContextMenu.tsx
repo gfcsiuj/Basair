@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../hooks/useApp';
 import { API_BASE, AUDIO_BASE } from '../constants';
 import { Panel, RepeatMode, Verse } from '../types';
+import { showToast } from './ToastContainer';
 
 const AyahContextMenu: React.FC = () => {
     const { state, actions } = useApp();
@@ -271,7 +272,7 @@ const AyahContextMenu: React.FC = () => {
             navigator.share({ title: 'آية من القرآن الكريم', text });
         } else {
             navigator.clipboard.writeText(text);
-            alert('تم نسخ الآية');
+            showToast('تم نسخ الآية', 'success');
         }
         onDismiss();
     };
@@ -283,7 +284,7 @@ const AyahContextMenu: React.FC = () => {
     const copyText = () => {
         if (!selectedAyah) return;
         navigator.clipboard.writeText(selectedAyah.text_uthmani);
-        alert('تم نسخ نص الآية');
+        showToast('تم نسخ نص الآية', 'success');
         onDismiss();
     };
 
@@ -295,6 +296,14 @@ const AyahContextMenu: React.FC = () => {
             activePanel: Panel.Notes,
         }));
         actions.selectAyah(null);
+    };
+
+    const handleBookmark = () => {
+        if (!selectedAyah) return;
+        actions.toggleBookmark(selectedAyah);
+        const isCurrentlyBookmarked = state.bookmarks.some(b => b.verseKey === selectedAyah.verse_key);
+        showToast(isCurrentlyBookmarked ? 'تمت الإزالة من المفضلة' : 'تمت الإضافة للمفضلة', 'success');
+        onDismiss();
     };
 
     const askAI = () => {
@@ -310,11 +319,13 @@ const AyahContextMenu: React.FC = () => {
 
     const surah = state.surahs.find(s => s.id === selectedAyah?.chapter_id);
     const isLastRead = state.lastRead?.verseKey === selectedAyah?.verse_key;
+    const isBookmarked = state.bookmarks.some(b => b.verseKey === selectedAyah?.verse_key);
 
     const mainMenuItems = [
         { icon: isListeningAudio ? 'fa-stop-circle' : 'fa-play-circle', label: isListeningAudio ? 'إيقاف' : 'استماع', action: playAudioInBackground, highlight: isListeningAudio },
         { icon: 'fa-book-open', label: 'التفسير', action: showTafsir },
-        { icon: 'fa-bookmark', label: 'آخر قراءة', action: handleLastRead, highlight: isLastRead },
+        { icon: 'fa-history', label: 'آخر قراءة', action: handleLastRead, highlight: isLastRead },
+        { icon: 'fa-bookmark', label: 'المفضلة', action: handleBookmark, highlight: isBookmarked },
         { icon: 'fa-pen-fancy', label: 'ملاحظة', action: addNote },
         { icon: 'fa-copy', label: 'نسخ', action: copyText },
         { icon: 'fa-share-alt', label: 'مشاركة', action: () => setShowShareOptions(true) },
@@ -325,49 +336,6 @@ const AyahContextMenu: React.FC = () => {
         { icon: 'fa-font', label: 'مشاركة كنص', action: shareText },
         { icon: 'fa-image', label: 'مشاركة كصورة', action: shareAsImage },
     ];
-
-
-
-    // Handle long press on words inside the menu -> Opens WordPopup
-    const handleWordPressStart = (e: React.MouseEvent | React.TouchEvent, wordObj: any) => {
-        if (!wordObj || !wordObj.originalWord) return;
-        e.stopPropagation();
-        const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-        const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-        wordPressStartPos.current = { x: clientX, y: clientY };
-
-        wordLongPressTimer.current = setTimeout(() => {
-            if (selectedAyah) {
-                actions.selectWord(selectedAyah, wordObj.originalWord);
-            }
-            wordLongPressTimer.current = null;
-        }, 500);
-    };
-
-    const handleWordPressEnd = (e: React.MouseEvent | React.TouchEvent, idx: number, audioUrl?: string | null) => {
-        if (wordLongPressTimer.current) {
-            clearTimeout(wordLongPressTimer.current);
-            wordLongPressTimer.current = null;
-            // It was a short tap, trigger play logic!
-            handleWordTap(e, idx, audioUrl);
-        }
-        wordPressStartPos.current = null;
-    };
-
-    const handleWordPressMove = (e: React.MouseEvent | React.TouchEvent) => {
-        if (wordLongPressTimer.current && wordPressStartPos.current) {
-            const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-            const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-            const dx = Math.abs(clientX - wordPressStartPos.current.x);
-            const dy = Math.abs(clientY - wordPressStartPos.current.y);
-
-            if (dx > 10 || dy > 10) {
-                clearTimeout(wordLongPressTimer.current);
-                wordLongPressTimer.current = null;
-                wordPressStartPos.current = null;
-            }
-        }
-    };
 
     // Handle tapping a word: highlight + play audio
     const handleWordTap = (e: React.MouseEvent | React.TouchEvent, wordIndex: number, audioUrl?: string | null) => {
@@ -450,20 +418,12 @@ const AyahContextMenu: React.FC = () => {
                                         return (
                                             <span key={idx}>
                                                 <span
-                                                    className={`word-tap-target ${activeWordIndex === idx ? 'word-highlight-active' : ''}`}
-                                                    onMouseDown={(e) => handleWordPressStart(e, wordObj)}
-                                                    onMouseUp={(e) => handleWordPressEnd(e, idx, wordObj.audioUrl)}
-                                                    onMouseLeave={(e) => handleWordPressEnd(e, idx, wordObj.audioUrl)}
-                                                    onMouseMove={handleWordPressMove}
-                                                    onTouchStart={(e) => handleWordPressStart(e, wordObj)}
-                                                    onTouchEnd={(e) => handleWordPressEnd(e, idx, wordObj.audioUrl)}
-                                                    onTouchMove={handleWordPressMove}
-                                                    onContextMenu={(e) => {
-                                                        e.preventDefault();
-                                                        if (wordObj.originalWord && selectedAyah) {
-                                                            actions.selectWord(selectedAyah, wordObj.originalWord);
-                                                        }
-                                                    }}
+                                                    key={idx}
+                                                    onClick={(e) => handleWordTap(e, idx, wordObj.audioUrl)}
+                                                    className={`
+                                                        relative inline-block cursor-pointer transition-all duration-200
+                                                        ${activeWordIndex === idx ? 'text-primary scale-110' : 'hover:text-primary'}
+                                                    `}
                                                 >
                                                     {wordObj.text}
                                                 </span>

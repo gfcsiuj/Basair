@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../hooks/useApp';
+import { showToast } from './ToastContainer';
 
 declare const html2canvas: any;
 
@@ -11,7 +12,16 @@ const THEMES = [
     { id: 'navy', label: 'كحلي', bg: '#0B172A', text: '#F0F4F8', accent: '#C5A059', border: '#1E3250' },
 ];
 
-// Removed CornerDecoration to keep pure geometric design.
+const SVG = {
+    close: 'M6 18L18 6M6 6l12 12',
+    image: 'M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z',
+    copy: 'M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75',
+    text: 'M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12',
+    moon: 'M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z',
+    fingerprint: 'M4.909 3.125C7.221 1.66 9.946 1.05 12.604 1.34m4.73 1.18c2.934 1.536 5.161 4.103 6.136 7.218m-17.742 2.378c-1.353-.173-2.617-.798-3.6-1.777m.434-6.4C4.306 2.394 6.619 1.488 9 1.4m11.166 2.052A12.03 12.03 0 0019 14.25v2.25M6.16 8.784a9.014 9.014 0 016.326-2.5 9.022 9.022 0 016.353 2.502m-11.411 7.32a6.002 6.002 0 012.046-5.835 6.007 6.007 0 016.368-1.25M4.825 13.91a8.97 8.97 0 011.025-2.66m9.67 6.37v-2.128c0-1.23-.393-2.427-1.11-3.398m-3.235 6.611c-1.29-.076-2.527-.514-3.51-1.255m7.456-1.637A8.995 8.995 0 0121 17.25M12 9c1.657 0 3 1.343 3 3v2.25M9.824 16.592c.621-.63 1.455-1.024 2.38-1.14M9 13v-1.5c0-.828.672-1.5 1.5-1.5s1.5.672 1.5 1.5v2.25M3.906 17.51A9.006 9.006 0 013 14.25',
+    spinner: 'M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z',
+    send: 'M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5',
+};
 
 const ShareImageGenerator: React.FC = () => {
     const { state, actions } = useApp();
@@ -145,7 +155,7 @@ const ShareImageGenerator: React.FC = () => {
                 await navigator.share({ title: 'آية من القرآن الكريم', text });
             } else {
                 navigator.clipboard.writeText(text);
-                alert('تم نسخ الآية');
+                showToast('تم نسخ الآية', 'success');
             }
             closeModal();
             return;
@@ -207,25 +217,31 @@ const ShareImageGenerator: React.FC = () => {
                 <div className="px-5 pt-5 pb-3 shrink-0">
                     <div className="flex items-center justify-between mb-4">
                         <h3 className="text-xl font-bold text-text-primary">مشاركة الآية</h3>
-                        <button onClick={closeModal} className="w-8 h-8 flex items-center justify-center text-text-secondary hover:bg-bg-secondary rounded-full transition-colors">
-                            <i className="fas fa-times"></i>
+                        <button onClick={closeModal} className="w-8 h-8 flex items-center justify-center text-text-secondary hover:bg-bg-secondary rounded-full transition-colors active:scale-90">
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d={SVG.close} />
+                            </svg>
                         </button>
                     </div>
 
                     {/* Tabs */}
-                    <div className="flex bg-bg-secondary rounded-xl p-1.5 gap-1.5">
+                    <div className="flex bg-bg-secondary rounded-xl p-1.5 gap-1.5 border border-border/50 shadow-sm">
                         <button
                             onClick={() => setActiveTab('image')}
-                            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-bold transition-all ${activeTab === 'image' ? 'bg-primary text-white shadow-md' : 'text-text-secondary hover:bg-bg-tertiary'}`}
+                            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'image' ? 'bg-primary text-white shadow-md' : 'text-text-secondary hover:bg-bg-tertiary'}`}
                         >
-                            <i className="fas fa-image"></i>
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d={SVG.image} />
+                            </svg>
                             مشاركة كصورة
                         </button>
                         <button
                             onClick={() => setActiveTab('text')}
-                            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-bold transition-all ${activeTab === 'text' ? 'bg-primary text-white shadow-md' : 'text-text-secondary hover:bg-bg-tertiary'}`}
+                            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'text' ? 'bg-primary text-white shadow-md' : 'text-text-secondary hover:bg-bg-tertiary'}`}
                         >
-                            <i className="fas fa-copy"></i>
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d={SVG.copy} />
+                            </svg>
                             كنص فقط
                         </button>
                     </div>
@@ -421,7 +437,9 @@ const ShareImageGenerator: React.FC = () => {
                                                         marginTop: '30px',
                                                         opacity: 0.8
                                                     }}>
-                                                        <i className="fas fa-fingerprint" style={{ fontSize: '42px', color: theme.accent, marginBottom: '16px' }}></i>
+                                                        <svg style={{ width: '42px', height: '42px', color: theme.accent, marginBottom: '16px' }} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d={SVG.fingerprint} />
+                                                        </svg>
                                                         <span style={{ fontFamily: "'Space Grotesk', 'Outfit', sans-serif", fontSize: '24px', fontWeight: 600, letterSpacing: '4px', color: theme.text, opacity: 0.7 }}>BASAER APP</span>
                                                     </div>
                                                 )}
@@ -460,23 +478,29 @@ const ShareImageGenerator: React.FC = () => {
                                 <div className="flex gap-2">
                                     <button
                                         onClick={() => setShowSurahName(!showSurahName)}
-                                        className={`flex-1 flex flex-col items-center justify-center gap-2 py-3 rounded-xl transition-all ${showSurahName ? 'bg-primary text-white shadow-md' : 'bg-bg-secondary text-text-secondary hover:bg-bg-tertiary'}`}
+                                        className={`flex-1 flex flex-col items-center justify-center gap-2 py-3 rounded-xl transition-all border border-transparent ${showSurahName ? 'bg-primary/10 text-primary border-primary/30 shadow-sm' : 'bg-bg-secondary text-text-secondary hover:bg-bg-tertiary'}`}
                                     >
-                                        <i className="fas fa-heading text-lg"></i>
+                                        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d={SVG.text} />
+                                        </svg>
                                         <span className="text-xs font-bold">اسم السورة</span>
                                     </button>
                                     <button
                                         onClick={() => setShowBismillah(!showBismillah)}
-                                        className={`flex-1 flex flex-col items-center justify-center gap-2 py-3 rounded-xl transition-all ${showBismillah ? 'bg-primary text-white shadow-md' : 'bg-bg-secondary text-text-secondary hover:bg-bg-tertiary'}`}
+                                        className={`flex-1 flex flex-col items-center justify-center gap-2 py-3 rounded-xl transition-all border border-transparent ${showBismillah ? 'bg-primary/10 text-primary border-primary/30 shadow-sm' : 'bg-bg-secondary text-text-secondary hover:bg-bg-tertiary'}`}
                                     >
-                                        <i className="fas fa-star-and-crescent text-lg"></i>
+                                        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d={SVG.moon} />
+                                        </svg>
                                         <span className="text-xs font-bold">البسملة</span>
                                     </button>
                                     <button
                                         onClick={() => setShowWatermark(!showWatermark)}
-                                        className={`flex-1 flex flex-col items-center justify-center gap-2 py-3 rounded-xl transition-all ${showWatermark ? 'bg-primary text-white shadow-md' : 'bg-bg-secondary text-text-secondary hover:bg-bg-tertiary'}`}
+                                        className={`flex-1 flex flex-col items-center justify-center gap-2 py-3 rounded-xl transition-all border border-transparent ${showWatermark ? 'bg-primary/10 text-primary border-primary/30 shadow-sm' : 'bg-bg-secondary text-text-secondary hover:bg-bg-tertiary'}`}
                                     >
-                                        <i className="fas fa-fingerprint text-lg"></i>
+                                        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d={SVG.fingerprint} />
+                                        </svg>
                                         <span className="text-xs font-bold">العلامة</span>
                                     </button>
                                 </div>
@@ -486,14 +510,19 @@ const ShareImageGenerator: React.FC = () => {
                 )}
 
                 {/* Mighty Share Action */}
-                <div className="p-5 shrink-0 bg-bg-secondary/50 border-t border-border">
+                <div className="p-5 shrink-0 bg-bg-secondary/50 border-t border-border mt-2">
                     <button
                         onClick={handleShare}
                         disabled={isSharing}
-                        className="w-full bg-primary text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-3 hover:brightness-110 transition-all disabled:opacity-50 shadow-xl active:scale-[0.98] text-lg"
-                        style={{ boxShadow: '0 8px 24px rgba(var(--highlight-color), 0.25)' }}
+                        className="w-full bg-primary text-white font-bold py-4 rounded-xl flex items-center justify-center gap-3 hover:brightness-110 transition-all disabled:opacity-50 shadow-lg shadow-primary/20 active:scale-[0.98] text-base"
                     >
-                        {isSharing ? <i className="fas fa-circle-notch fa-spin text-xl"></i> : <i className="fas fa-paper-plane text-xl"></i>}
+                        {isSharing ? (
+                            <svg className="w-5 h-5 animate-spin" fill="currentColor" viewBox="0 0 24 24"><path d={SVG.spinner} /></svg>
+                        ) : (
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d={SVG.send} />
+                            </svg>
+                        )}
                         {isSharing ? 'جاري رسم وإعداد اللوحة الفاخرة...' : 'إرسال اللوحة القرآنية'}
                     </button>
                 </div>

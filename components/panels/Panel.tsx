@@ -87,7 +87,9 @@ const Panel: React.FC<PanelProps> = ({ id, title, children, headerActions }) => 
                 <div className="flex items-center gap-1">
                     {headerActions}
                     <button onClick={() => actions.openPanel(null)} className="w-8 h-8 flex items-center justify-center hover:bg-white/15 rounded-full transition-colors">
-                        <i className="fas fa-times text-lg"></i>
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
                     </button>
                 </div>
             </header>

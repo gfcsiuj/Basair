@@ -8,7 +8,8 @@ import { useApp } from './hooks/useApp';
 import MainReadingInterface from './components/MainReadingInterface';
 
 import AIAssistant from './components/AIAssistant';
-import { MenuPanel, StatisticsPanel, SupplicationsPanel, TasbeehPanel, NotesPanel } from './components/panels/MenuPanel';
+import { MenuPanel, StatisticsPanel, TasbeehPanel, NotesPanel } from './components/panels/MenuPanel';
+import DuasPanel from './components/panels/DuasPanel';
 import IndexPanel from './components/panels/IndexPanel';
 import SettingsPanel from './components/panels/SettingsPanel';
 import BookmarksPanel from './components/panels/BookmarksPanel';
@@ -18,12 +19,15 @@ import DashboardPanel from './components/panels/DashboardPanel';
 import ThematicIndexPanel from './components/panels/ThematicIndexPanel';
 import PrayerTimesPanel from './components/panels/PrayerTimesPanel';
 import OfflineManagerPanel from './components/panels/OfflineManagerPanel';
+import HadithPanel from './components/panels/HadithPanel';
+import AchievementsPanel from './components/panels/AchievementsPanel';
 import TafsirPopup from './components/TafsirPopup';
 import ShareImageGenerator from './components/ShareImageGenerator';
 import Onboarding from './components/Onboarding';
-import WordPopup from './components/WordPopup';
+
 import AyahContextMenu from './components/AyahContextMenu';
 import SelectionModal from './components/modals/SelectionModal';
+import ToastContainer, { showToast } from './components/ToastContainer';
 import { AppContext } from './context';
 
 // Polyfill for crypto.randomUUID() which is not available in non-secure contexts (HTTP)
@@ -49,6 +53,13 @@ const customReciters: Reciter[] = [
     { id: 1003, reciter_name: 'ياسر الدوسري', style: 'The Quran Project' },
     { id: 1004, reciter_name: 'هاني الرفاعي', style: 'The Quran Project' },
 ];
+
+// Shared custom reciter ID -> audio code mapping
+const CUSTOM_RECITER_MAP: Record<number, number> = {
+    1001: 2, 1002: 3, 1003: 4, 1004: 5, 1005: 6, 1006: 7, 1007: 8,
+    1008: 9, 1009: 10, 1010: 11, 1011: 12, 1012: 13, 1013: 14, 1014: 15,
+    1015: 16, 1016: 17, 1017: 18, 1018: 19, 1019: 20, 1020: 21
+};
 
 // --- Reusable Modals (Moved here to avoid stacking context issues) ---
 
@@ -203,7 +214,7 @@ const App: React.FC = () => {
         contextMenuInitialWordPosition: null,
         playbackRate: parseFloat(localStorage.getItem('playbackRate') || '1'),
         isAutoScrolling: false,
-        autoScrollSpeed: 1,
+        autoScrollSpeed: parseFloat(localStorage.getItem('autoScrollSpeed') || '1'),
         downloadProgress: {},
         offlineStatus: {
             quranText: false,
@@ -268,16 +279,11 @@ const App: React.FC = () => {
 
     const getAudioUrlForVerse = useCallback((verse: Verse, reciterId: number): string => {
         if (reciterId >= 1001) {
-            const surahId = verse.chapter_id;
-            const ayahId = verse.verse_number;
-            let reciterCode = 0;
-            switch (reciterId) {
-                case 1001: reciterCode = 2; break;
-                case 1002: reciterCode = 3; break;
-                case 1003: reciterCode = 4; break;
-                case 1004: reciterCode = 5; break;
+            const reciterCode = CUSTOM_RECITER_MAP[reciterId];
+            if (reciterCode) {
+                return `https://the-quran-project.github.io/Quran-Audio/Data/${reciterCode}/${verse.chapter_id}_${verse.verse_number}.mp3`;
             }
-            return reciterCode > 0 ? `https://the-quran-project.github.io/Quran-Audio/Data/${reciterCode}/${surahId}_${ayahId}.mp3` : '';
+            return '';
         }
         return verse.audio?.url ? `${AUDIO_BASE}${verse.audio.url}` : '';
     }, []);
@@ -549,7 +555,7 @@ const App: React.FC = () => {
         let currentPermission = state.notificationPermission;
 
         if (!('Notification' in window)) {
-            alert('هذا المتصفح لا يدعم الإشعارات.');
+            showToast('هذا المتصفح لا يدعم الإشعارات.', 'warning');
             return;
         }
 
@@ -559,7 +565,7 @@ const App: React.FC = () => {
         }
 
         if (currentPermission === 'denied') {
-            alert('تم رفض إذن الإشعارات. يرجى تفعيلها من إعدادات المتصفح.');
+            showToast('تم رفض إذن الإشعارات. يرجى تفعيلها من إعدادات المتصفح.', 'error');
             return;
         }
 
@@ -568,9 +574,9 @@ const App: React.FC = () => {
                 const newIsEnabled = !s.areNotificationsEnabled;
                 localStorage.setItem('areNotificationsEnabled', JSON.stringify(newIsEnabled));
                 if (newIsEnabled) {
-                    alert('تم تفعيل إشعارات الصلاة.');
+                    showToast('تم تفعيل إشعارات الصلاة.', 'success');
                 } else {
-                    alert('تم إيقاف إشعارات الصلاة.');
+                    showToast('تم إيقاف إشعارات الصلاة.', 'info');
                 }
                 return { ...s, areNotificationsEnabled: newIsEnabled };
             });
@@ -1006,6 +1012,7 @@ const App: React.FC = () => {
 
     const setAutoScrollSpeed = useCallback((speed: number) => {
         setState(s => ({ ...s, autoScrollSpeed: speed }));
+        localStorage.setItem('autoScrollSpeed', String(speed));
     }, []);
 
     const recordUserActivity = useCallback(() => {
@@ -1184,10 +1191,19 @@ const App: React.FC = () => {
 
     if (!state.isInitialized && state.isLoading) {
         return (
-            <div className="flex items-center justify-center h-screen bg-bg-primary text-text-primary">
-                <div className="text-center">
-                    <i className="fas fa-spinner fa-spin text-4xl text-primary"></i>
-                    <p className="mt-4">جاري تهيئة المصحف...</p>
+            <div className="flex items-center justify-center h-screen bg-gradient-to-br from-primary/5 via-bg-primary to-secondary/5 text-text-primary">
+                <div className="text-center space-y-6">
+                    <div className="relative w-20 h-20 mx-auto">
+                        <div className="absolute inset-0 rounded-full border-4 border-primary/20"></div>
+                        <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-primary animate-spin"></div>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                            <i className="fas fa-quran text-2xl text-primary"></i>
+                        </div>
+                    </div>
+                    <div>
+                        <h1 className="text-2xl font-bold text-primary mb-1">بصائر</h1>
+                        <p className="text-sm text-text-secondary">جاري تهيئة المصحف...</p>
+                    </div>
                 </div>
             </div>
         );
@@ -1199,6 +1215,7 @@ const App: React.FC = () => {
                 {state.isFirstLaunch && <Onboarding />}
                 <audio ref={audioRef} id="page-audio" className="hidden"></audio>
                 <audio ref={preloadAudioRef} className="hidden" preload="auto"></audio>
+                <ToastContainer />
 
                 {state.readingMode === ReadingMode.Reading && <MainReadingInterface />}
 
@@ -1215,14 +1232,16 @@ const App: React.FC = () => {
                 <SearchPanel />
                 <StatisticsPanel />
                 <KhatmahPanel />
-                <SupplicationsPanel />
+                <DuasPanel />
                 <TasbeehPanel />
                 <NotesPanel />
                 <OfflineManagerPanel />
+                <HadithPanel />
+                <AchievementsPanel />
 
                 {/* Popups / Modals */}
                 <TafsirPopup />
-                <WordPopup />
+
                 <AyahContextMenu />
                 <ShareImageGenerator />
                 {state.isReciterModalOpen && (

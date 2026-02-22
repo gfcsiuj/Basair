@@ -64,13 +64,13 @@ const KhatmahModal: React.FC<{
                             </div>
                             <div>
                                 <label className="text-sm text-text-secondary">المدة (بالأيام)</label>
-                                <input type="number" value={duration} onChange={e => setDuration(parseInt(e.target.value))} min="1" className="input w-full bg-bg-secondary border-border" />
+                                <input type="number" value={duration} onChange={e => setDuration(parseInt(e.target.value) || 1)} min="1" className="input w-full bg-bg-secondary border-border" />
                             </div>
                         </>
                     ) : (
                         <div>
                             <label className="text-sm text-text-secondary">وصلت إلى الصفحة رقم</label>
-                            <input type="number" value={pagesRead} onChange={e => setPagesRead(parseInt(e.target.value))} min="0" max={TOTAL_PAGES} className="input w-full bg-bg-secondary border-border" />
+                            <input type="number" value={pagesRead} onChange={e => setPagesRead(parseInt(e.target.value) || 0)} min="0" max={TOTAL_PAGES} className="input w-full bg-bg-secondary border-border" />
                         </div>
                     )}
                     {error && <p className="text-red-500 text-xs">{error}</p>}
@@ -91,7 +91,7 @@ const KhatmahCard: React.FC<{
     onUpdate: (k: Khatmah) => void;
 }> = ({ khatmah, onUpdate }) => {
     const { actions } = useApp();
-    
+
     const stats = useMemo(() => {
         const today = new Date().toISOString();
         const daysElapsed = daysBetween(today, khatmah.startDate);
@@ -109,7 +109,7 @@ const KhatmahCard: React.FC<{
             <div className="flex justify-between items-start">
                 <h4 className="font-bold text-text-primary">{khatmah.name}</h4>
                 <button onClick={() => actions.deleteKhatmah(khatmah.id)} className="text-red-500/70 hover:text-red-500 text-sm">
-                    <i className="fas fa-trash"></i>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
                 </button>
             </div>
 
@@ -137,7 +137,7 @@ const KhatmahCard: React.FC<{
                     <p className="text-xs text-text-secondary">ورد اليوم</p>
                 </div>
             </div>
-            
+
             <button onClick={() => onUpdate(khatmah)} className="w-full bg-primary/10 text-primary font-bold py-2 px-4 rounded-lg text-sm hover:bg-primary/20 transition-colors">
                 تحديث التقدم
             </button>
@@ -167,11 +167,16 @@ const KhatmahPanel: React.FC = () => {
         <Panel id={PanelType.Khatmahs} title="الختمات">
             <div className="p-4 space-y-4">
                 {activeKhatmahs.length === 0 && completedKhatmahs.length === 0 && (
-                     <div className="text-center py-10 px-4 text-text-secondary">
-                        <i className="fas fa-calendar-check text-4xl mb-4"></i>
-                        <p className="font-bold text-lg">لا يوجد ختمات بعد</p>
-                        <p className="text-sm">ابدأ ختمة جديدة لتتبع تقدمك في قراءة القرآن الكريم.</p>
-                     </div>
+                    <div className="flex flex-col items-center justify-center py-16 px-6 text-text-secondary animate-fadeIn text-center">
+                        <div className="relative w-20 h-20 mb-6">
+                            <div className="absolute inset-0 bg-primary/10 rounded-full blur-2xl"></div>
+                            <div className="relative w-full h-full bg-gradient-to-br from-primary/15 to-bg-secondary rounded-3xl rotate-12 flex items-center justify-center border border-primary/20 shadow-lg shadow-primary/5">
+                                <svg className="w-9 h-9 text-primary -rotate-12" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" /></svg>
+                            </div>
+                        </div>
+                        <h3 className="font-bold text-xl text-text-primary mb-2">{'لا يوجد ختمات بعد'}</h3>
+                        <p className="text-sm text-text-tertiary leading-relaxed max-w-[260px]">{'ابدأ ختمة جديدة لتتبع تقدمك في قراءة القرآن الكريم.'}</p>
+                    </div>
                 )}
 
                 {activeKhatmahs.length > 0 && (
@@ -180,26 +185,26 @@ const KhatmahPanel: React.FC = () => {
                         {activeKhatmahs.map(k => <KhatmahCard key={k.id} khatmah={k} onUpdate={handleOpenUpdateModal} />)}
                     </div>
                 )}
-                
+
                 {completedKhatmahs.length > 0 && (
                     <div className="space-y-3">
-                         <h3 className="font-bold text-text-secondary text-sm px-1 mt-6">الختمات المكتملة</h3>
-                         {completedKhatmahs.map(k => (
-                             <div key={k.id} className="bg-bg-secondary p-4 rounded-lg opacity-70">
-                                <p className="text-text-primary"><i className="fas fa-check-circle text-green-500 mr-2"></i>{k.name} - <span className="text-text-secondary text-sm">أكملت في {k.duration} يوم</span></p>
-                             </div>
-                         ))}
+                        <h3 className="font-bold text-text-secondary text-sm px-1 mt-6">الختمات المكتملة</h3>
+                        {completedKhatmahs.map(k => (
+                            <div key={k.id} className="bg-bg-secondary p-4 rounded-2xl border border-border/30 opacity-80">
+                                <p className="text-text-primary flex items-center gap-2"><svg className="w-5 h-5 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>{k.name} - <span className="text-text-secondary text-sm">{'أكملت في'} {k.duration} {'يوم'}</span></p>
+                            </div>
+                        ))}
                     </div>
                 )}
 
-                <button onClick={() => setModalState('add')} className="w-full bg-primary text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 hover:bg-primary-dark transition-colors mt-4">
-                    <i className="fas fa-plus"></i>
-                    <span>إنشاء ختمة جديدة</span>
+                <button onClick={() => setModalState('add')} className="w-full bg-primary text-white font-bold py-3.5 px-4 rounded-2xl flex items-center justify-center gap-2.5 hover:bg-primary-dark transition-colors mt-4 shadow-lg shadow-primary/20 active:scale-[0.98]">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                    <span>{'إنشاء ختمة جديدة'}</span>
                 </button>
             </div>
-            
+
             {modalState !== 'hidden' && (
-                <KhatmahModal 
+                <KhatmahModal
                     mode={modalState}
                     khatmah={selectedKhatmah}
                     onClose={() => {

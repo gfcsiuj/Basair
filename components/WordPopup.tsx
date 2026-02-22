@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../hooks/useApp';
+import { showToast } from './ToastContainer';
 import { API_BASE, AUDIO_BASE } from '../constants';
 import { Panel } from '../types';
 
@@ -39,7 +40,7 @@ const WordPopup: React.FC = () => {
             setTranslateY(0);
         }
     };
-    
+
     const style: React.CSSProperties = {
         transform: `translateY(${translateY}px)`,
         transition: isDragging ? 'none' : 'transform 0.3s ease-out',
@@ -59,7 +60,7 @@ const WordPopup: React.FC = () => {
             setIsRendered(false);
         }
     };
-    
+
     if (!isRendered || !selectedWord) return null;
 
     const { verse, word } = selectedWord;
@@ -78,7 +79,7 @@ const WordPopup: React.FC = () => {
         }
         closeModal();
     };
-    
+
     const playWordAudio = (e: React.MouseEvent) => {
         e.stopPropagation();
         if (word.audio_url) {
@@ -90,7 +91,7 @@ const WordPopup: React.FC = () => {
     const showTafsir = () => {
         actions.setState(s => ({ ...s, selectedAyah: verse, showTafsir: true, selectedWord: null }));
     };
-    
+
     const handleBookmark = () => {
         actions.toggleBookmark(verse);
         closeModal();
@@ -99,13 +100,13 @@ const WordPopup: React.FC = () => {
     const shareAsImage = () => {
         actions.setState(s => ({ ...s, selectedAyah: verse, showShareImageModal: true, selectedWord: null }));
     };
-    
+
     const copyText = () => {
         navigator.clipboard.writeText(verse.text_uthmani);
-        alert('تم نسخ نص الآية');
+        showToast('تم نسخ نص الآية', 'success');
         closeModal();
     };
-    
+
     const addNote = () => {
         actions.setState(s => ({
             ...s,
@@ -140,7 +141,7 @@ const WordPopup: React.FC = () => {
     return (
         <>
             <div className={`fixed inset-0 z-40 bg-black/30 backdrop-blur-sm ${isVisible ? 'animate-fadeIn' : 'animate-fadeOut'}`} onClick={closeModal}></div>
-            <div 
+            <div
                 onAnimationEnd={handleAnimationEnd}
                 className={`fixed bottom-0 left-0 right-0 bg-bg-primary rounded-t-2xl shadow-lg z-50 touch-none ${isVisible ? 'animate-slideInUp' : 'animate-slideOutDown'}`}
                 style={style}
@@ -150,13 +151,13 @@ const WordPopup: React.FC = () => {
             >
                 <div className="p-4 relative">
                     <div className="w-12 h-1.5 bg-bg-tertiary rounded-full mx-auto mb-4"></div>
-                    
+
                     <div className="mb-4 text-center">
                         <div className="flex items-center justify-center gap-3 mb-2">
-                             <p className="font-arabic text-3xl font-bold text-primary">{word.text_uthmani}</p>
-                             {word.audio_url && (
-                                <button 
-                                    onClick={playWordAudio} 
+                            <p className="font-arabic text-3xl font-bold text-primary">{word.text_uthmani}</p>
+                            {word.audio_url && (
+                                <button
+                                    onClick={playWordAudio}
                                     className="w-10 h-10 flex items-center justify-center bg-primary/10 text-primary rounded-full hover:bg-primary/20 transition-colors"
                                     aria-label={`استماع لكلمة ${word.text_uthmani}`}
                                 >
