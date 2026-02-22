@@ -11,12 +11,13 @@ import { renderedFontPages } from '../utils/fontPageTracker';
  * VerseGlyphSegment - wraps a verse's glyph characters in a trackable inline span.
  * When the verse is playing, this span highlights with glow + progress bar.
  */
-const VerseGlyphSegment = React.memo(({ verseKey, text, pageVerses }: { verseKey: string; text: string; pageVerses: Verse[] | null }) => {
-    const { state } = useApp();
+const VerseGlyphSegment = React.memo(({ verseKey, words, pageVerses }: { verseKey: string; words: { id: number, text: string, position: number }[]; pageVerses: Verse[] | null }) => {
+    const { state, actions } = useApp();
     const ref = useRef<HTMLSpanElement>(null);
 
     const isPlaying = state.isPlaying && state.audioQueue[state.currentAudioIndex]?.verseKey === verseKey;
     const isLastRead = state.lastRead?.verseKey === verseKey;
+    const isSelected = state.highlightedAyahKey === verseKey;
 
     // Auto-scroll to the playing verse segment
     useEffect(() => {
@@ -30,15 +31,77 @@ const VerseGlyphSegment = React.memo(({ verseKey, text, pageVerses }: { verseKey
         ? Math.min(100, (state.audioCurrentTime / state.audioDuration) * 100)
         : 0;
 
+    const wordLongPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const wordPressStartPos = useRef<{ x: number; y: number } | null>(null);
+    const isLongPressTriggered = useRef(false);
 
+    const handlePressStart = (e: React.MouseEvent | React.TouchEvent, position: number) => {
+        e.stopPropagation();
+        const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+        const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+        wordPressStartPos.current = { x: clientX, y: clientY };
+        isLongPressTriggered.current = false;
+
+        wordLongPressTimer.current = setTimeout(() => {
+            const verse = pageVerses?.find(v => v.verse_key === verseKey);
+            if (verse) {
+                try { navigator.vibrate(20); } catch (err) { }
+                isLongPressTriggered.current = true;
+                actions.selectAyah(verse, position);
+            }
+            wordLongPressTimer.current = null;
+        }, 500);
+    };
+
+    const handlePressMove = (e: React.MouseEvent | React.TouchEvent) => {
+        if (wordLongPressTimer.current && wordPressStartPos.current) {
+            const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+            const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+            const dx = Math.abs(clientX - wordPressStartPos.current.x);
+            const dy = Math.abs(clientY - wordPressStartPos.current.y);
+
+            if (dx > 10 || dy > 10) {
+                clearTimeout(wordLongPressTimer.current);
+                wordLongPressTimer.current = null;
+                wordPressStartPos.current = null;
+            }
+        }
+    };
+
+    const handlePressEnd = (e: React.MouseEvent | React.TouchEvent) => {
+        if (wordLongPressTimer.current) {
+            clearTimeout(wordLongPressTimer.current);
+            wordLongPressTimer.current = null;
+        }
+        wordPressStartPos.current = null;
+        if (isLongPressTriggered.current) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    };
 
     return (
         <span
             ref={ref}
             data-verse-key={verseKey}
-            className={`verse-glyph-segment ${isPlaying ? 'verse-glyph-active' : ''} ${isLastRead ? 'verse-last-read' : ''}`}
+            className={`verse-glyph-segment ${isPlaying ? 'verse-glyph-active' : ''} ${isLastRead ? 'verse-last-read' : ''} ${isSelected ? 'verse-selected' : ''}`}
         >
-            {text}
+            {words.map(w => (
+                <span
+                    key={w.id}
+                    className="word cursor-pointer"
+                    onMouseDown={(e) => handlePressStart(e, w.position)}
+                    onMouseUp={handlePressEnd}
+                    onMouseLeave={handlePressEnd}
+                    onMouseMove={handlePressMove}
+                    onTouchStart={(e) => handlePressStart(e, w.position)}
+                    onTouchEnd={handlePressEnd}
+                    onTouchMove={handlePressMove}
+                    onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                >
+                    {w.text}
+                </span>
+            ))}
             {/* Progress bar */}
             {isPlaying && (
                 <span
@@ -46,7 +109,6 @@ const VerseGlyphSegment = React.memo(({ verseKey, text, pageVerses }: { verseKey
                     style={{ width: `${progress}%` }}
                 />
             )}
-
         </span>
     );
 });
@@ -83,7 +145,7 @@ const QuranPage: React.FC<{
     pageVerses: Verse[] | null;
     pageNumber?: number;
 }> = ({ pageVerses, pageNumber }) => {
-    const { state } = useApp();
+    const { state, actions } = useApp();
     const { isLoading, error, font, surahs, wordGlyphData, layoutDb } = state;
     // Use the passed pageNumber or fall back to global state currentPage
     const targetPage = pageNumber || state.currentPage;
@@ -214,23 +276,17 @@ const QuranPage: React.FC<{
 
 
 
-    // Memoize word glyphs into a Map for fast O(1) lookups
-    const memoizedWordGlyphsById = useMemo(() => {
+    // Build a unified Map for fast O(1) lookups: wordId -> { text, verseKey, position }
+    const wordIdDataMap = useMemo(() => {
         if (!wordGlyphData) return null;
-        const map = new Map<number, string>();
-        for (const wordInfo of Object.values(wordGlyphData)) {
-            map.set(wordInfo.id, wordInfo.text);
-        }
-        return map;
-    }, [wordGlyphData]);
-
-    // Build a wordId → verseKey lookup map for O(1) verse identification
-    const wordIdToVerseKey = useMemo(() => {
-        if (!wordGlyphData) return null;
-        const map = new Map<number, string>();
+        const map = new Map<number, { text: string; verseKey: string; position: number }>();
         for (const [key, wordInfo] of Object.entries(wordGlyphData)) {
             const parts = key.split(':');
-            map.set(wordInfo.id, `${parts[0]}:${parts[1]}`);
+            map.set(wordInfo.id, {
+                text: wordInfo.text,
+                verseKey: `${parts[0]}:${parts[1]}`,
+                position: parseInt(parts[2], 10)
+            });
         }
         return map;
     }, [wordGlyphData]);
@@ -264,30 +320,31 @@ const QuranPage: React.FC<{
                         </div>
                     );
                 case 'ayah':
-                    if (memoizedWordGlyphsById && wordIdToVerseKey && line.first_word_id && line.last_word_id) {
+                    if (wordIdDataMap && line.first_word_id && line.last_word_id) {
                         // Group word glyphs by verse key for precise per-verse tracking
-                        const segments: { verseKey: string; text: string }[] = [];
+                        const segments: { verseKey: string; words: { id: number; text: string; position: number }[] }[] = [];
                         let currentVerseKey = '';
-                        let currentText = '';
+                        let currentWords: { id: number; text: string; position: number }[] = [];
 
                         for (let i = line.first_word_id; i <= line.last_word_id; i++) {
-                            const glyph = memoizedWordGlyphsById.get(i) || '';
-                            const vk = wordIdToVerseKey.get(i) || '';
+                            const data = wordIdDataMap.get(i);
+                            if (!data) continue;
+                            const { text, verseKey: vk, position } = data;
 
-                            if (vk !== currentVerseKey && currentText) {
-                                segments.push({ verseKey: currentVerseKey, text: currentText });
-                                currentText = '';
+                            if (vk !== currentVerseKey && currentWords.length > 0) {
+                                segments.push({ verseKey: currentVerseKey, words: currentWords });
+                                currentWords = [];
                             }
                             currentVerseKey = vk;
-                            currentText += glyph;
+                            currentWords.push({ id: i, text, position });
                         }
-                        if (currentText) {
-                            segments.push({ verseKey: currentVerseKey, text: currentText });
+                        if (currentWords.length > 0) {
+                            segments.push({ verseKey: currentVerseKey, words: currentWords });
                         }
 
                         // Render each verse segment as a separate trackable span
                         lineContent = segments.map((seg, i) => (
-                            <VerseGlyphSegment key={`${seg.verseKey}-${i}`} verseKey={seg.verseKey} text={seg.text} pageVerses={pageVerses} />
+                            <VerseGlyphSegment key={`${seg.verseKey}-${i}`} verseKey={seg.verseKey} words={seg.words} pageVerses={pageVerses} />
                         ));
                     }
                     // استخدام InteractiveLine للأسطر التي تحتوي على آيات
@@ -307,7 +364,7 @@ const QuranPage: React.FC<{
                     return null;
             }
         });
-    }, [linesForPage, surahs, memoizedWordGlyphsById, wordIdToVerseKey, pageVerses]);
+    }, [linesForPage, surahs, wordIdDataMap, pageVerses]);
 
     if (isLoading && !pageContent) {
         return (
@@ -361,8 +418,14 @@ const QuranPage: React.FC<{
 
     const isCenteredPage = targetPage === 1 || targetPage === 2;
 
+    const handlePageClick = () => {
+        if (state.highlightedAyahKey) {
+            actions.clearAyahHighlight();
+        }
+    };
+
     return (
-        <div className="w-full" style={{ opacity: isFontReady ? 1 : 0 }}>
+        <div className="w-full" style={{ opacity: isFontReady ? 1 : 0 }} onClick={handlePageClick}>
             <PageJuzHeader />
             <div className={isCenteredPage ? 'quran-page-centered' : ''} style={pageStyle}>
                 {state.isVerseByVerseLayout ? (

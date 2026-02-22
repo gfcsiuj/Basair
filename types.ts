@@ -201,6 +201,8 @@ export interface AppState {
     aiAutoPrompt: string | null;
     isFirstLaunch: boolean;
     selectedWord: { verse: Verse, word: Word } | null;
+    highlightedAyahKey: string | null;
+    contextMenuInitialWordPosition: number | null;
     playbackRate: number;
     isAutoScrolling: boolean;
     autoScrollSpeed: number;
@@ -244,7 +246,8 @@ export interface AppActions {
     setFontSize: (size: number) => void;
     openPanel: (panel: Panel | null) => void;
     setReadingMode: (mode: ReadingMode) => void;
-    selectAyah: (ayah: Verse | null) => void;
+    selectAyah: (ayah: Verse | null, initialActiveWordPosition?: number) => void;
+    clearAyahHighlight: () => void;
     togglePlayPause: () => void;
     playNext: () => void;
     playPrev: () => void;

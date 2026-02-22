@@ -199,6 +199,8 @@ const App: React.FC = () => {
         isAIAssistantOpen: false,
         aiAutoPrompt: null,
         selectedWord: null,
+        highlightedAyahKey: null,
+        contextMenuInitialWordPosition: null,
         playbackRate: parseFloat(localStorage.getItem('playbackRate') || '1'),
         isAutoScrolling: false,
         autoScrollSpeed: 1,
@@ -285,7 +287,8 @@ const App: React.FC = () => {
         const apiReciterId = state.selectedReciterId >= 1001 ? 7 : state.selectedReciterId;
         const tafsirId = state.selectedTafsirId;
         const translationId = state.selectedTranslationId;
-        const wordParams = state.font === 'qpc-v1' ? '' : '&words=true&word_fields=text_uthmani,translation';
+        // Always fetch words to ensure we get audio_url for word-by-word playback, regardless of font
+        const wordParams = '&words=true&word_fields=text_uthmani,translation,audio_url';
         const url = `${API_BASE}/verses/by_page/${pageNumber}?language=ar${wordParams}&audio=${apiReciterId}&tafsirs=${tafsirId}&translations=${translationId}&fields=text_uthmani,chapter_id,juz_number,page_number,verse_key,verse_number,words,audio`;
         const data = await fetchWithRetry<{ verses: Verse[] }>(url, 3, signal);
 
@@ -312,6 +315,16 @@ const App: React.FC = () => {
             const fetchAndProcessPage = async (pageNum: number): Promise<Verse[] | null> => {
                 if (pageNum < 1 || pageNum > TOTAL_PAGES) return null;
                 const offlineData = await offlineManager.getPageData(pageNum);
+
+                // If offline data exists but is missing words (from old cache), re-fetch it
+                if (offlineData && offlineData.length > 0 && (!offlineData[0].words || offlineData[0].words.length === 0)) {
+                    const freshData = await getPageData(pageNum);
+                    if (freshData) {
+                        await offlineManager.savePageData(pageNum, freshData);
+                    }
+                    return freshData;
+                }
+
                 return offlineData || await getPageData(pageNum);
             };
 
@@ -749,8 +762,18 @@ const App: React.FC = () => {
         setState(s => ({ ...s, readingMode: mode, activePanel: null }));
     }, []);
 
-    const selectAyah = useCallback((ayah: Verse | null) => {
-        setState(s => ({ ...s, selectedAyah: ayah, selectedWord: null }));
+    const selectAyah = useCallback((ayah: Verse | null, initialActiveWordPosition?: number) => {
+        setState(s => ({
+            ...s,
+            selectedAyah: ayah,
+            highlightedAyahKey: ayah ? ayah.verse_key : s.highlightedAyahKey,
+            selectedWord: null,
+            contextMenuInitialWordPosition: initialActiveWordPosition ?? null
+        }));
+    }, []);
+
+    const clearAyahHighlight = useCallback(() => {
+        setState(s => ({ ...s, highlightedAyahKey: null }));
     }, []);
 
     const selectWord = useCallback((verse: Verse, word: Word) => {
@@ -1007,7 +1030,7 @@ const App: React.FC = () => {
     const contextValue: AppContextType = useMemo(() => ({
         state,
         actions: {
-            loadPage, setTheme, setFont, setFontSize, openPanel, setReadingMode, selectAyah, togglePlayPause, playNext, playPrev,
+            loadPage, setTheme, setFont, setFontSize, openPanel, setReadingMode, selectAyah, clearAyahHighlight, togglePlayPause, playNext, playPrev,
             playRange, toggleBookmark, addKhatmah, updateKhatmahProgress, deleteKhatmah, addNote, updateNote, deleteNote,
             addTasbeehCounter, updateTasbeehCounter, updateTasbeehCounterDetails, deleteTasbeehCounter, resetTasbeehCounter, resetAllTasbeehCounters,
             setReciter, setTafsir, setTranslation, fetchWithRetry, setState, recordUserActivity, toggleUIVisibility, selectWord,
@@ -1021,8 +1044,7 @@ const App: React.FC = () => {
     }), [state, loadPage, setTheme, setFont, setFontSize, openPanel, setReadingMode, selectAyah, togglePlayPause, playNext, playPrev,
         playRange, toggleBookmark, addKhatmah, updateKhatmahProgress, deleteKhatmah, addNote, updateNote, deleteNote, addTasbeehCounter,
         updateTasbeehCounter, updateTasbeehCounterDetails, deleteTasbeehCounter, resetTasbeehCounter, resetAllTasbeehCounters, setReciter,
-        setTafsir, setTranslation, fetchWithRetry, recordUserActivity, toggleUIVisibility, selectWord, setPlaybackRate,
-        toggleAutoScroll, setAutoScrollSpeed, startDownload, deleteDownloadedContent, setRepeatMode, toggleVerseByVerseLayout, getPageData, toggleFavoriteReciter, toggleFavoriteTafsir, toggleFavoriteTranslation, loadPrayerTimes, toggleNotifications, setCustomColor]);
+        toggleAutoScroll, setAutoScrollSpeed, startDownload, deleteDownloadedContent, setRepeatMode, toggleVerseByVerseLayout, getPageData, toggleFavoriteReciter, toggleFavoriteTafsir, toggleFavoriteTranslation, loadPrayerTimes, toggleNotifications, setCustomColor, clearAyahHighlight]);
 
     useEffect(() => {
         document.documentElement.setAttribute('data-theme', state.theme);

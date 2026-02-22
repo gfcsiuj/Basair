@@ -11,6 +11,8 @@ const AyahContextMenu: React.FC = () => {
     const [activeWordIndex, setActiveWordIndex] = useState<number | null>(null);
     const standaloneAudioRef = useRef<HTMLAudioElement | null>(null);
     const wordAudioRef = useRef<HTMLAudioElement | null>(null);
+    const wordLongPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const wordPressStartPos = useRef<{ x: number, y: number } | null>(null);
 
     // Animation state
     const isVisible = !!selectedAyah;
@@ -87,13 +89,77 @@ const AyahContextMenu: React.FC = () => {
         paddingBottom: 'env(safe-area-inset-bottom, 0rem)',
     };
 
+    const fontStyle: React.CSSProperties = {};
+    let renderWords: { text: string; audioUrl?: string | null; isWord: boolean; originalWord?: any }[] = [];
+
+    if (state.font === 'qpc-v1' && selectedAyah && state.wordGlyphData) {
+        fontStyle.fontFamily = `'quran-font-p${selectedAyah.page_number}'`;
+        const verseKeyPrefix = `${selectedAyah.chapter_id}:${selectedAyah.verse_number}:`;
+
+        const qpcWords = Object.entries(state.wordGlyphData)
+            .filter(([key]) => key.startsWith(verseKeyPrefix))
+            .map(([key, wordInfo]) => ({ ...wordInfo, wordNum: parseInt(key.split(':')[2], 10) }))
+            .sort((a, b) => a.wordNum - b.wordNum);
+
+        renderWords = qpcWords.map((qpcWord) => {
+            const apiWord = selectedAyah.words?.find(w => w.position === qpcWord.wordNum);
+
+            const chapterStr = String(selectedAyah.chapter_id).padStart(3, '0');
+            const ayahStr = String(selectedAyah.verse_number).padStart(3, '0');
+            const wordNumStr = String(qpcWord.wordNum).padStart(3, '0');
+            const fixedAudioUrl = `wbw/${chapterStr}_${ayahStr}_${wordNumStr}.mp3`;
+
+            return {
+                text: (qpcWord as any).text,
+                audioUrl: apiWord ? fixedAudioUrl : undefined,
+                isWord: apiWord ? apiWord.char_type_name === 'word' : false,
+                originalWord: apiWord
+            };
+        });
+    } else {
+        if (selectedAyah?.words) {
+            renderWords = selectedAyah.words.map((apiWord) => {
+                const chapterStr = String(selectedAyah.chapter_id).padStart(3, '0');
+                const ayahStr = String(selectedAyah.verse_number).padStart(3, '0');
+                const posStr = String(apiWord.position || 0).padStart(3, '0');
+                const fixedAudioUrl = `wbw/${chapterStr}_${ayahStr}_${posStr}.mp3`;
+
+                return {
+                    text: apiWord.text_uthmani,
+                    audioUrl: apiWord.char_type_name === 'word' ? fixedAudioUrl : apiWord.audio_url,
+                    isWord: apiWord.char_type_name === 'word',
+                    originalWord: apiWord
+                };
+            });
+        } else if (selectedAyah?.text_uthmani) {
+            renderWords = [{ text: selectedAyah.text_uthmani, isWord: false }];
+        }
+    }
 
     useEffect(() => {
         if (isVisible) {
             setIsRendered(true);
             setShowShareOptions(false);
             setTranslateY(0);
-            setActiveWordIndex(null);
+
+            if (state.contextMenuInitialWordPosition && renderWords.length > 0) {
+                const initialIdx = renderWords.findIndex(w => w.originalWord?.position === state.contextMenuInitialWordPosition);
+                if (initialIdx !== -1) {
+                    setActiveWordIndex(initialIdx);
+                    const wordObj = renderWords[initialIdx];
+                    if (wordObj.audioUrl) {
+                        const audio = new Audio(`${AUDIO_BASE}${wordObj.audioUrl}`);
+                        wordAudioRef.current = audio;
+                        audio.onended = () => { wordAudioRef.current = null; };
+                        audio.onerror = () => { wordAudioRef.current = null; };
+                        audio.play().catch(console.error);
+                    }
+                } else {
+                    setActiveWordIndex(null);
+                }
+            } else {
+                setActiveWordIndex(null);
+            }
         } else {
             // Stop standalone audio when context menu closes
             if (standaloneAudioRef.current) {
@@ -101,8 +167,14 @@ const AyahContextMenu: React.FC = () => {
                 standaloneAudioRef.current = null;
                 setIsListeningAudio(false);
             }
+            if (wordAudioRef.current) {
+                wordAudioRef.current.pause();
+                wordAudioRef.current = null;
+            }
+            setActiveWordIndex(null);
         }
-    }, [isVisible]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isVisible, state.contextMenuInitialWordPosition]);
 
     const handleAnimationEnd = () => {
         if (!isVisible) {
@@ -254,46 +326,71 @@ const AyahContextMenu: React.FC = () => {
         { icon: 'fa-image', label: 'مشاركة كصورة', action: shareAsImage },
     ];
 
-    const fontStyle: React.CSSProperties = {};
-    let ayahText = selectedAyah?.text_uthmani;
 
-    if (state.font === 'qpc-v1' && selectedAyah && state.wordGlyphData) {
-        fontStyle.fontFamily = `'quran-font-p${selectedAyah.page_number}'`;
-        const verseKeyPrefix = `${selectedAyah.chapter_id}:${selectedAyah.verse_number}:`;
-        ayahText = Object.entries(state.wordGlyphData)
-            .filter(([key]) => key.startsWith(verseKeyPrefix))
-            .map(([key, wordInfo]) => ({ ...wordInfo, wordNum: parseInt(key.split(':')[2], 10) }))
-            .sort((a, b) => a.wordNum - b.wordNum)
-            .map(wordInfo => (wordInfo as any).text)
-            .join('');
-    }
 
-    // Build word list for clickable word-by-word audio
-    const wordsList = selectedAyah?.words?.filter(w => w.char_type_name === 'word') || [];
+    // Handle long press on words inside the menu -> Opens WordPopup
+    const handleWordPressStart = (e: React.MouseEvent | React.TouchEvent, wordObj: any) => {
+        if (!wordObj || !wordObj.originalWord) return;
+        e.stopPropagation();
+        const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+        const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+        wordPressStartPos.current = { x: clientX, y: clientY };
+
+        wordLongPressTimer.current = setTimeout(() => {
+            if (selectedAyah) {
+                actions.selectWord(selectedAyah, wordObj.originalWord);
+            }
+            wordLongPressTimer.current = null;
+        }, 500);
+    };
+
+    const handleWordPressEnd = (e: React.MouseEvent | React.TouchEvent, idx: number, audioUrl?: string | null) => {
+        if (wordLongPressTimer.current) {
+            clearTimeout(wordLongPressTimer.current);
+            wordLongPressTimer.current = null;
+            // It was a short tap, trigger play logic!
+            handleWordTap(e, idx, audioUrl);
+        }
+        wordPressStartPos.current = null;
+    };
+
+    const handleWordPressMove = (e: React.MouseEvent | React.TouchEvent) => {
+        if (wordLongPressTimer.current && wordPressStartPos.current) {
+            const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+            const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+            const dx = Math.abs(clientX - wordPressStartPos.current.x);
+            const dy = Math.abs(clientY - wordPressStartPos.current.y);
+
+            if (dx > 10 || dy > 10) {
+                clearTimeout(wordLongPressTimer.current);
+                wordLongPressTimer.current = null;
+                wordPressStartPos.current = null;
+            }
+        }
+    };
 
     // Handle tapping a word: highlight + play audio
-    const handleWordTap = (wordIndex: number, word: any) => {
+    const handleWordTap = (e: React.MouseEvent | React.TouchEvent, wordIndex: number, audioUrl?: string | null) => {
+        e.stopPropagation();
         setActiveWordIndex(wordIndex);
+
         // Stop any previous word audio
         if (wordAudioRef.current) {
             wordAudioRef.current.pause();
             wordAudioRef.current = null;
         }
-        if (word.audio_url) {
-            const audio = new Audio(`${AUDIO_BASE}${word.audio_url}`);
+
+        if (audioUrl) {
+            const audio = new Audio(`${AUDIO_BASE}${audioUrl}`);
             wordAudioRef.current = audio;
             audio.onended = () => {
                 wordAudioRef.current = null;
-                // Keep highlight for a moment then clear
-                setTimeout(() => setActiveWordIndex(null), 400);
+                // Intentional: Do not remove activeWordIndex here so the highlight stays
             };
             audio.onerror = () => {
                 wordAudioRef.current = null;
-                setActiveWordIndex(null);
             };
-            audio.play().catch(() => setActiveWordIndex(null));
-        } else {
-            setTimeout(() => setActiveWordIndex(null), 600);
+            audio.play().catch(console.error);
         }
     };
 
@@ -347,19 +444,37 @@ const AyahContextMenu: React.FC = () => {
                     {/* Verse preview card */}
                     <div className="mb-4 bg-bg-secondary rounded-2xl p-4 border border-border/50">
                         <p className="font-arabic text-lg text-center leading-loose" dir="rtl" style={{ ...fontStyle, wordWrap: 'break-word', overflowWrap: 'break-word', whiteSpace: 'pre-wrap', display: 'block', width: '100%' }}>
-                            {wordsList.length > 0 ? (
-                                wordsList.map((word, idx) => (
-                                    <span
-                                        key={idx}
-                                        className={`word-tap-target ${activeWordIndex === idx ? 'word-highlight-active' : ''}`}
-                                        onClick={() => handleWordTap(idx, word)}
-                                    >
-                                        {word.text_uthmani}
-                                    </span>
-                                ))
-                            ) : (
-                                ayahText
-                            )}
+                            {renderWords.length > 0 ? (
+                                renderWords.map((wordObj, idx) => {
+                                    if (wordObj.isWord || wordObj.audioUrl) {
+                                        return (
+                                            <span key={idx}>
+                                                <span
+                                                    className={`word-tap-target ${activeWordIndex === idx ? 'word-highlight-active' : ''}`}
+                                                    onMouseDown={(e) => handleWordPressStart(e, wordObj)}
+                                                    onMouseUp={(e) => handleWordPressEnd(e, idx, wordObj.audioUrl)}
+                                                    onMouseLeave={(e) => handleWordPressEnd(e, idx, wordObj.audioUrl)}
+                                                    onMouseMove={handleWordPressMove}
+                                                    onTouchStart={(e) => handleWordPressStart(e, wordObj)}
+                                                    onTouchEnd={(e) => handleWordPressEnd(e, idx, wordObj.audioUrl)}
+                                                    onTouchMove={handleWordPressMove}
+                                                    onContextMenu={(e) => {
+                                                        e.preventDefault();
+                                                        if (wordObj.originalWord && selectedAyah) {
+                                                            actions.selectWord(selectedAyah, wordObj.originalWord);
+                                                        }
+                                                    }}
+                                                >
+                                                    {wordObj.text}
+                                                </span>
+                                                {state.font !== 'qpc-v1' && " "}
+                                            </span>
+                                        );
+                                    } else {
+                                        return <span key={idx}>{wordObj.text}{state.font !== 'qpc-v1' && " "}</span>;
+                                    }
+                                })
+                            ) : null}
                         </p>
                         <div className="flex items-center justify-center gap-2 mt-2">
                             <span className="text-xs px-3 py-1 bg-primary/10 text-primary rounded-full font-medium">

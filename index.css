@@ -578,31 +578,15 @@ input[type="range"].page-slider::-webkit-slider-thumb:active {
 
 /* ====== Verse Selected Highlight (Context Menu Open) ====== */
 .verse-selected {
-    background: linear-gradient(135deg,
-            rgba(var(--highlight-color), 0.1) 0%,
-            rgba(var(--highlight-color), 0.2) 50%,
-            rgba(var(--highlight-color), 0.1) 100%);
+    background: rgba(var(--highlight-color), 0.15);
     border-radius: 0.5rem;
     box-decoration-break: clone;
     -webkit-box-decoration-break: clone;
-    padding: 4px 6px;
+    padding: 2px 4px;
     position: relative;
-    outline: 2px solid rgba(var(--highlight-color), 0.4);
-    outline-offset: 3px;
-    animation: verse-selected-pulse 1.5s ease-in-out infinite;
+    z-index: 5;
 }
 
-@keyframes verse-selected-pulse {
-
-    0%,
-    100% {
-        outline-color: rgba(var(--highlight-color), 0.3);
-    }
-
-    50% {
-        outline-color: rgba(var(--highlight-color), 0.6);
-    }
-}
 
 /* ====== Last Read Verse Marker ====== */
 .verse-last-read {

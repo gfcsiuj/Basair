@@ -13,7 +13,7 @@ const Ayah: React.FC<AyahProps> = ({ verse }) => {
 
 
     const isPlaying = state.isPlaying && state.audioQueue[state.currentAudioIndex]?.verseKey === verse.verse_key;
-    const isSelected = state.selectedAyah?.verse_key === verse.verse_key;
+    const isSelected = state.highlightedAyahKey === verse.verse_key;
     const isLastRead = state.lastRead?.verseKey === verse.verse_key;
 
     // Calculate progress percentage based on audio time
@@ -31,27 +31,34 @@ const Ayah: React.FC<AyahProps> = ({ verse }) => {
 
     const wordLongPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const wordPressStartPos = useRef<{ x: number, y: number } | null>(null);
+    const isLongPressTriggered = useRef(false);
 
     const ayahLongPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const handlePressStart = (e: React.MouseEvent | React.TouchEvent, word: Word) => {
+    const handlePressStart = (e: React.MouseEvent | React.TouchEvent, word: Word | { position: number }) => {
         e.stopPropagation();
         const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
         const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
         wordPressStartPos.current = { x: clientX, y: clientY };
+        isLongPressTriggered.current = false;
 
         wordLongPressTimer.current = setTimeout(() => {
-            actions.selectWord(verse, word);
+            isLongPressTriggered.current = true;
+            actions.selectAyah(verse, word.position);
             wordLongPressTimer.current = null;
         }, 500);
     };
 
-    const handlePressEnd = () => {
+    const handlePressEnd = (e: React.MouseEvent | React.TouchEvent) => {
         if (wordLongPressTimer.current) {
             clearTimeout(wordLongPressTimer.current);
             wordLongPressTimer.current = null;
         }
         wordPressStartPos.current = null;
+        if (isLongPressTriggered.current) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
     };
 
     const handlePressMove = (e: React.MouseEvent | React.TouchEvent) => {
@@ -100,7 +107,50 @@ const Ayah: React.FC<AyahProps> = ({ verse }) => {
     // Render the verse text content
     const renderVerseContent = () => {
         if (font === 'qpc-v1') {
-            return <>{verse.glyphText ?? verse.text_uthmani}</>;
+            if (!state.wordGlyphData) {
+                return <>{verse.glyphText ?? verse.text_uthmani}</>;
+            }
+
+            const verseKeyPrefix = `${verse.chapter_id}:${verse.verse_number}:`;
+            const qpcWords = Object.entries(state.wordGlyphData)
+                .filter(([key]) => key.startsWith(verseKeyPrefix))
+                .map(([key, wordInfo]) => {
+                    const parts = key.split(':');
+                    return {
+                        id: wordInfo.id,
+                        text: wordInfo.text,
+                        position: parseInt(parts[2], 10)
+                    };
+                })
+                .sort((a, b) => a.position - b.position);
+
+            if (qpcWords.length === 0) {
+                return <>{verse.glyphText ?? verse.text_uthmani}</>;
+            }
+
+            return (
+                <>
+                    {qpcWords.map(qWord => (
+                        <span
+                            key={qWord.id}
+                            className="word inline-block"
+                            onMouseDown={(e) => handlePressStart(e, { position: qWord.position } as any)}
+                            onMouseUp={handlePressEnd}
+                            onMouseLeave={handlePressEnd}
+                            onMouseMove={handlePressMove}
+                            onTouchStart={(e) => handlePressStart(e, { position: qWord.position } as any)}
+                            onTouchEnd={handlePressEnd}
+                            onTouchMove={handlePressMove}
+                            onContextMenu={(e) => e.preventDefault()}
+                        >
+                            {qWord.text}
+                        </span>
+                    ))}
+                    <span className="verse-number-badge inline-block text-[0.4em] translate-y-[-0.6em] mx-1">
+                        {verseNumberArabic}
+                    </span>
+                </>
+            );
         }
 
         return (
@@ -108,7 +158,7 @@ const Ayah: React.FC<AyahProps> = ({ verse }) => {
                 {verse.words.filter(word => word.char_type_name === 'word').map(word => (
                     <React.Fragment key={word.id}>
                         <span
-                            className="word hover:text-primary transition-colors"
+                            className="word inline-block"
                             onMouseDown={(e) => handlePressStart(e, word)}
                             onMouseUp={handlePressEnd}
                             onMouseLeave={handlePressEnd}

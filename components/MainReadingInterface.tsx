@@ -43,7 +43,8 @@ const MainReadingInterface: React.FC = () => {
             const apiReciterId = state.selectedReciterId >= 1001 ? 7 : state.selectedReciterId;
             const tafsirId = state.selectedTafsirId;
             const translationId = state.selectedTranslationId;
-            const wordParams = state.font === 'qpc-v1' ? '' : '&words=true&word_fields=text_uthmani,translation';
+            // Always fetch words to ensure we get audio_url for word-by-word playback, regardless of font
+            const wordParams = '&words=true&word_fields=text_uthmani,translation,audio_url';
 
             const url = `${API_BASE}/verses/by_page/${pageNumber}?language=ar${wordParams}&audio=${apiReciterId}&tafsirs=${tafsirId}&translations=${translationId}&fields=text_uthmani,chapter_id,juz_number,page_number,verse_key,verse_number,words,audio`;
 

@@ -32,8 +32,14 @@ const VerseByVersePage: React.FC<VerseByVersePageProps> = ({ pageVerses }) => {
 
     const verseNumberArabic = (num: number) => new Intl.NumberFormat('ar-EG').format(num);
 
+    const handlePageClick = () => {
+        if (state.highlightedAyahKey) {
+            actions.clearAyahHighlight();
+        }
+    };
+
     return (
-        <div className="w-full flex flex-col gap-4 px-3 py-5 md:px-6 max-w-3xl mx-auto">
+        <div className="w-full flex flex-col gap-4 px-3 py-5 md:px-6 max-w-3xl mx-auto" onClick={handlePageClick}>
             {pageVerses.map((verse, index) => {
                 const glyphText = getGlyphText(verse);
                 const isPlaying = isPlayingVerse(verse);
@@ -46,7 +52,7 @@ const VerseByVersePage: React.FC<VerseByVersePageProps> = ({ pageVerses }) => {
                                 flex flex-col gap-3 p-4 rounded-2xl transition-all duration-500
                                 ${isPlaying
                                     ? 'bg-primary/8 ring-2 ring-primary/30 shadow-lg shadow-primary/5'
-                                    : state.selectedAyah?.verse_key === verse.verse_key
+                                    : state.highlightedAyahKey === verse.verse_key
                                         ? 'bg-primary/5 ring-1 ring-primary/20'
                                         : 'bg-white/60 dark:bg-white/5 hover:bg-white/80 dark:hover:bg-white/8'
                                 }
