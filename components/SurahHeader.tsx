@@ -60,10 +60,12 @@ const SurahHeader: React.FC<SurahHeaderProps> = ({ surah }) => {
             >
                 <span
                     style={{
-                        fontSize: 'clamp(1rem, 4.5vw, 1.6rem)',
+                        fontSize: 'clamp(1.3rem, 5.5vw, 2rem)',
                         fontFamily: "'surah-names'",
                         lineHeight: 1,
                         display: 'inline-block',
+                        fontWeight: 'normal',
+                        WebkitTextStroke: '0.24px currentColor',
                     }}
                 >
                     {surahNameChar}
