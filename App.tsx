@@ -12,6 +12,7 @@ import { MenuPanel, StatisticsPanel, TasbeehPanel, NotesPanel } from './componen
 import DuasPanel from './components/panels/DuasPanel';
 import IndexPanel from './components/panels/IndexPanel';
 import SettingsPanel from './components/panels/SettingsPanel';
+import MemorizationInterface from './components/MemorizationInterface';
 import BookmarksPanel from './components/panels/BookmarksPanel';
 import SearchPanel from './components/panels/SearchPanel';
 import KhatmahPanel from './components/panels/KhatmahPanel';
@@ -241,6 +242,7 @@ const App: React.FC = () => {
         areNotificationsEnabled: JSON.parse(localStorage.getItem('areNotificationsEnabled') || 'false'),
         customThemeColor: localStorage.getItem('customThemeColor') || '#10b981',
         lastRead: JSON.parse(localStorage.getItem('lastRead') || 'null'),
+        memorizationStats: JSON.parse(localStorage.getItem('memorizationStats') || '{"points":0,"streak":0}'),
     });
 
     // --- API & Data Loading ---
@@ -586,7 +588,16 @@ const App: React.FC = () => {
     useEffect(() => {
         const initializeApp = async () => {
             try {
-                const aiInstance = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+                // Gemini AI is optional — Wit.ai is used for voice recognition
+                let aiInstance: GoogleGenAI | null = null;
+                try {
+                    const apiKey = process.env.API_KEY || import.meta.env.VITE_GEMINI_API_KEY;
+                    if (apiKey) {
+                        aiInstance = new GoogleGenAI({ apiKey: apiKey as string });
+                    }
+                } catch (e) {
+                    console.warn('Gemini AI initialization skipped:', e);
+                }
 
                 if ('Notification' in window) {
                     setState(s => ({ ...s, notificationPermission: Notification.permission }));
@@ -1034,6 +1045,17 @@ const App: React.FC = () => {
         });
     }, []);
 
+    const addMemorizationPoints = useCallback((points: number) => {
+        setState(s => {
+            const newStats = {
+                points: Math.max(0, s.memorizationStats.points + points),
+                streak: points > 0 ? s.memorizationStats.streak + 1 : Math.max(0, s.memorizationStats.streak - 1),
+            };
+            localStorage.setItem('memorizationStats', JSON.stringify(newStats));
+            return { ...s, memorizationStats: newStats };
+        });
+    }, []);
+
     const contextValue: AppContextType = useMemo(() => ({
         state,
         actions: {
@@ -1047,11 +1069,12 @@ const App: React.FC = () => {
             loadPrayerTimes,
             toggleNotifications,
             setCustomColor,
+            addMemorizationPoints,
         }
     }), [state, loadPage, setTheme, setFont, setFontSize, openPanel, setReadingMode, selectAyah, togglePlayPause, playNext, playPrev,
         playRange, toggleBookmark, addKhatmah, updateKhatmahProgress, deleteKhatmah, addNote, updateNote, deleteNote, addTasbeehCounter,
         updateTasbeehCounter, updateTasbeehCounterDetails, deleteTasbeehCounter, resetTasbeehCounter, resetAllTasbeehCounters, setReciter,
-        toggleAutoScroll, setAutoScrollSpeed, startDownload, deleteDownloadedContent, setRepeatMode, toggleVerseByVerseLayout, getPageData, toggleFavoriteReciter, toggleFavoriteTafsir, toggleFavoriteTranslation, loadPrayerTimes, toggleNotifications, setCustomColor, clearAyahHighlight]);
+        toggleAutoScroll, setAutoScrollSpeed, startDownload, deleteDownloadedContent, setRepeatMode, toggleVerseByVerseLayout, getPageData, toggleFavoriteReciter, toggleFavoriteTafsir, toggleFavoriteTranslation, loadPrayerTimes, toggleNotifications, setCustomColor, clearAyahHighlight, addMemorizationPoints]);
 
     useEffect(() => {
         document.documentElement.setAttribute('data-theme', state.theme);
@@ -1217,8 +1240,11 @@ const App: React.FC = () => {
                 <audio ref={preloadAudioRef} className="hidden" preload="auto"></audio>
                 <ToastContainer />
 
-                {state.readingMode === ReadingMode.Reading && <MainReadingInterface />}
-
+                {/* Interfaces */}
+                <div className="flex-1 relative overflow-hidden">
+                    {state.readingMode === ReadingMode.Reading && <MainReadingInterface />}
+                    {state.readingMode === ReadingMode.Memorization && <MemorizationInterface />}
+                </div>
                 <AIAssistant />
 
                 {/* Panels */}

@@ -5,6 +5,17 @@ import type { Database } from 'sql.js';
 
 export enum ReadingMode {
     Reading = 'reading',
+    Memorization = 'memorization',
+}
+
+export enum AyahWordState {
+    Hidden = 'hidden',
+    Waiting = 'waiting',
+    Correct = 'correct',
+    Incorrect = 'incorrect',
+    Skipped = 'skipped',
+    Hinted = 'hinted',
+    Revealed = 'revealed',
 }
 
 export enum Panel {
@@ -234,6 +245,7 @@ export interface AppState {
     customThemeColor: string;
     areNotificationsEnabled: boolean;
     lastRead: { verseKey: string; pageNumber: number; text: string; surahName: string } | null;
+    memorizationStats: { points: number; streak: number };
 }
 
 export type DownloadableItem = {
@@ -289,6 +301,7 @@ export interface AppActions {
     loadPrayerTimes: () => Promise<void>;
     toggleNotifications: () => Promise<void>;
     setCustomColor: (color: string) => void;
+    addMemorizationPoints: (points: number) => void;
 }
 
 export interface AppContextType {
