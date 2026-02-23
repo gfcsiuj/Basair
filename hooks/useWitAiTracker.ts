@@ -40,12 +40,19 @@ interface UseWitAiTrackerReturn {
 /**
  * إرسال مقطع صوتي إلى Wit.ai واستقبال النص
  */
-const transcribeWithWitAi = async (audioBlob: Blob): Promise<string> => {
+const transcribeWithWitAi = async (audioBlob: Blob, mimeType: string): Promise<string> => {
+    // Wit.ai expects standard content types. If the browser gives us 'audio/webm;codecs=opus', 
+    // it's safer to just send 'audio/webm' to Wit.ai to avoid 400 Bad Request errors.
+    let contentType = mimeType || audioBlob.type || 'audio/webm';
+    if (contentType.includes(';')) {
+        contentType = contentType.split(';')[0];
+    }
+
     const response = await fetch('https://api.wit.ai/speech?v=20240101', {
         method: 'POST',
         headers: {
             'Authorization': `Bearer ${WIT_AI_TOKEN}`,
-            'Content-Type': audioBlob.type || 'audio/webm',
+            'Content-Type': contentType,
         },
         body: audioBlob,
     });
@@ -169,7 +176,8 @@ export const useWitAiTracker = ({
 
         setIsLoading(true);
         try {
-            const text = await transcribeWithWitAi(audioBlob);
+            const actualMimeType = mediaRecorderRef.current?.mimeType || 'audio/webm';
+            const text = await transcribeWithWitAi(audioBlob, actualMimeType);
             if (text) {
                 processTranscription(text);
             }
