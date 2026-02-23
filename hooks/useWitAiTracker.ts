@@ -40,19 +40,46 @@ interface UseWitAiTrackerReturn {
 /**
  * إرسال مقطع صوتي إلى Wit.ai واستقبال النص
  */
-const transcribeWithWitAi = async (audioBlob: Blob, mimeType: string): Promise<string> => {
-    // Wit.ai expects standard content types. If the browser gives us 'audio/webm;codecs=opus', 
-    // it's safer to just send 'audio/webm' to Wit.ai to avoid 400 Bad Request errors.
-    let contentType = mimeType || audioBlob.type || 'audio/webm';
-    if (contentType.includes(';')) {
-        contentType = contentType.split(';')[0];
+const encodeWAV = (samples: Float32Array, sampleRate: number): Blob => {
+    const buffer = new ArrayBuffer(44 + samples.length * 2);
+    const view = new DataView(buffer);
+
+    const writeString = (view: DataView, offset: number, string: string) => {
+        for (let i = 0; i < string.length; i++) {
+            view.setUint8(offset + i, string.charCodeAt(i));
+        }
+    };
+
+    writeString(view, 0, 'RIFF');
+    view.setUint32(4, 36 + samples.length * 2, true);
+    writeString(view, 8, 'WAVE');
+    writeString(view, 12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true); // PCM
+    view.setUint16(22, 1, true); // 1 channel
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * 2, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true);
+    writeString(view, 36, 'data');
+    view.setUint32(40, samples.length * 2, true);
+
+    let offset = 44;
+    for (let i = 0; i < samples.length; i++, offset += 2) {
+        const s = Math.max(-1, Math.min(1, samples[i]));
+        view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
     }
 
+    return new Blob([view], { type: 'audio/wav' });
+};
+
+const transcribeWithWitAi = async (audioBlob: Blob): Promise<string> => {
+    // We strictly use audio/wav now to prevent 400 Bad Request from Wit.ai
     const response = await fetch('https://api.wit.ai/speech?v=20240101', {
         method: 'POST',
         headers: {
             'Authorization': `Bearer ${WIT_AI_TOKEN}`,
-            'Content-Type': contentType,
+            'Content-Type': 'audio/wav',
         },
         body: audioBlob,
     });
@@ -166,18 +193,21 @@ export const useWitAiTracker = ({
     const sendChunkToWitAi = useCallback(async () => {
         if (chunksRef.current.length === 0) return;
 
-        const audioBlob = new Blob(chunksRef.current, {
-            type: mediaRecorderRef.current?.mimeType || 'audio/webm',
-        });
+        const mimeType = mediaRecorderRef.current?.mimeType || 'audio/webm';
+        const rawBlob = new Blob(chunksRef.current, { type: mimeType });
         chunksRef.current = [];
 
-        // تجاهل المقاطع الصغيرة جداً (أقل من 1KB — ربما صمت)
-        if (audioBlob.size < 1000) return;
+        if (rawBlob.size < 1000) return;
 
         setIsLoading(true);
         try {
-            const actualMimeType = mediaRecorderRef.current?.mimeType || 'audio/webm';
-            const text = await transcribeWithWitAi(audioBlob, actualMimeType);
+            // تحويل الملف إلى WAV لتجنب خطأ 400 من Wit.ai
+            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
+            const arrayBuffer = await rawBlob.arrayBuffer();
+            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+            const wavBlob = encodeWAV(audioBuffer.getChannelData(0), audioBuffer.sampleRate);
+
+            const text = await transcribeWithWitAi(wavBlob);
             if (text) {
                 processTranscription(text);
             }
