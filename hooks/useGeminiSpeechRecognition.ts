@@ -42,6 +42,11 @@ export const useGeminiSpeechRecognition = ({
     const latestProcessedSeqRef = useRef(-1);
     const pendingResultsRef = useRef<Map<number, string>>(new Map());
 
+    // Strict Request Queue to prevent parallel API calls and handle 429
+    const isProcessingQueueRef = useRef(false);
+    const requestQueueRef = useRef<{ blob: Blob, seq: number }[]>([]);
+    const backoffDelayRef = useRef(1000); // 1 second initial backoff
+
     useEffect(() => { expectedWordsRef.current = expectedWords; }, [expectedWords]);
     useEffect(() => { currentIndexRef.current = currentIndex; }, [currentIndex]);
 
@@ -103,87 +108,120 @@ export const useGeminiSpeechRecognition = ({
         }
     }, [onWordMatch, onWordMismatch]);
 
-    const sendBlobToGemini = async (blob: Blob, seq: number) => {
-        try {
-            const base64 = await blobToBase64(blob);
-            const expectedText = expectedWordsRef.current
-                .slice(currentIndexRef.current, currentIndexRef.current + 20)
-                .join(' ');
+    const processQueue = useCallback(async () => {
+        if (isProcessingQueueRef.current || requestQueueRef.current.length === 0) return;
 
-            const promptText = `أنت في تطبيق تسميع القرآن. المستخدم يقرأ الآيات بصوته وحالتها مقسمة لمقاطع.
-اكتب الكلمات التي تسمعها باللغة العربية حصراً فقط لا غير.
+        isProcessingQueueRef.current = true;
+
+        while (requestQueueRef.current.length > 0 && isListeningRef.current) {
+            const { blob, seq } = requestQueueRef.current[0]; // Peek at the first item
+
+            try {
+                const base64 = await blobToBase64(blob);
+                const expectedText = expectedWordsRef.current
+                    .slice(currentIndexRef.current, currentIndexRef.current + 20)
+                    .join(' ');
+
+                const promptText = `أنت في تطبيق تسميع القرآن. المستخدم يقرأ الآيات بصوته وحالتها مقسمة لمقاطع.
+اكتب الكلمات التي تسمعها باللغة العربية حصراً فقط لا غير ولا تكتب أي تعليقات.
 يُتوقع أن يكون النص أو جزء منه: "${expectedText}"
 اكتب الكلمات بدون تشكيل. إذا كان صمتاً أرجع نص فارغ تماماً.`;
 
-            const requestBody = {
-                contents: [{
-                    parts: [
-                        { text: promptText },
-                        {
-                            inline_data: {
-                                mime_type: blob.type || 'audio/webm',
-                                data: base64.split(',')[1]
+                const requestBody = {
+                    contents: [{
+                        parts: [
+                            { text: promptText },
+                            {
+                                inline_data: {
+                                    mime_type: blob.type || 'audio/webm',
+                                    data: base64.split(',')[1]
+                                }
                             }
-                        }
-                    ]
-                }],
-                generationConfig: {
-                    temperature: 0.1,
-                    maxOutputTokens: 200
+                        ]
+                    }],
+                    generationConfig: {
+                        temperature: 0.1,
+                        maxOutputTokens: 200
+                    }
+                };
+
+                const response = await fetch(GEMINI_API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestBody)
+                });
+
+                if (!response.ok) {
+                    if (response.status === 429) {
+                        console.warn(`تم تجاوز الحد المسموح للطلبات (429). ننتظر ${backoffDelayRef.current / 1000} ثانية...`);
+                        // Wait for backoff duration without removing from queue
+                        await new Promise(resolve => setTimeout(resolve, backoffDelayRef.current));
+
+                        // Exponential backoff up to 10 seconds max
+                        backoffDelayRef.current = Math.min(backoffDelayRef.current * 1.5, 10000);
+                        continue; // Retry the same request
+                    } else {
+                        console.error("خطأ في الاتصال بالخادم:", response.status);
+                        throw new Error(`HTTP Error: ${response.status}`);
+                    }
                 }
-            };
 
-            const response = await fetch(GEMINI_API_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(requestBody)
-            });
+                // Request succeeded, reset backoff
+                backoffDelayRef.current = 1000;
 
-            if (!response.ok) {
-                if (response.status === 429) {
-                    console.warn("تم تجاوز الحد المسموح للطلبات (429). سنقوم بتأخير الطلب القادم.");
-                } else {
-                    console.error("خطأ في الاتصال بالخادم:", response.status);
+                // Remove item from queue only on success or permanent error
+                requestQueueRef.current.shift();
+
+                const data = await response.json();
+
+                let transcript = '';
+                if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
+                    transcript = data.candidates[0].content.parts[0].text;
                 }
-                throw new Error(`HTTP Error: ${response.status}`);
-            }
 
-            const data = await response.json();
-
-            let transcript = '';
-            if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
-                transcript = data.candidates[0].content.parts[0].text;
-            }
-
-            // Queue and process in order
-            pendingResultsRef.current.set(seq, transcript);
-            while (pendingResultsRef.current.has(latestProcessedSeqRef.current + 1)) {
-                const nextSeq = latestProcessedSeqRef.current + 1;
-                const text = pendingResultsRef.current.get(nextSeq);
-                pendingResultsRef.current.delete(nextSeq);
-                if (text) {
-                    processWords(text);
+                // Queue and process in order
+                pendingResultsRef.current.set(seq, transcript);
+                while (pendingResultsRef.current.has(latestProcessedSeqRef.current + 1)) {
+                    const nextSeq = latestProcessedSeqRef.current + 1;
+                    const text = pendingResultsRef.current.get(nextSeq);
+                    pendingResultsRef.current.delete(nextSeq);
+                    if (text) {
+                        processWords(text);
+                    }
+                    latestProcessedSeqRef.current = nextSeq;
                 }
-                latestProcessedSeqRef.current = nextSeq;
-            }
 
-        } catch (e) {
-            console.error("Gemini API error:", e);
-            pendingResultsRef.current.set(seq, '');
-            while (pendingResultsRef.current.has(latestProcessedSeqRef.current + 1)) {
-                latestProcessedSeqRef.current++;
-                pendingResultsRef.current.delete(latestProcessedSeqRef.current);
+                // Small delay between successful requests to be nice to the API
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+            } catch (e) {
+                console.error("Gemini API error:", e);
+                // Remove item from queue on permanent error so we don't get stuck forever
+                requestQueueRef.current.shift();
+
+                pendingResultsRef.current.set(seq, '');
+                while (pendingResultsRef.current.has(latestProcessedSeqRef.current + 1)) {
+                    latestProcessedSeqRef.current++;
+                    pendingResultsRef.current.delete(latestProcessedSeqRef.current);
+                }
             }
         }
-    };
+
+        isProcessingQueueRef.current = false;
+    }, [processWords]);
+
+    const queueBlobForGemini = useCallback((blob: Blob, seq: number) => {
+        requestQueueRef.current.push({ blob, seq });
+        processQueue();
+    }, [processQueue]);
 
     const startRecordingLoop = useCallback(() => {
         if (!isListeningRef.current || !streamRef.current) return;
 
-        // Use 6s chunks, overlapping by 1s (step = 5s) to ensure we stay under 15 Requests/Min
-        // 60 seconds / 5s = 12 requests per minute (Safe under 15 RPM limit)
-        const CHUNK_DURATION = 6000;
-        const STEP_DURATION = 5000;
+        // Use slightly larger 8s chunks, step 6s to reduce request volume further
+        // 60 / 6 = 10 requests per minute total
+        const CHUNK_DURATION = 8000;
+        const STEP_DURATION = 6000;
 
         const loop = () => {
             if (!isListeningRef.current) return;
@@ -201,7 +239,7 @@ export const useGeminiSpeechRecognition = ({
                 recordersRef.current = recordersRef.current.filter(r => r !== mr);
 
                 if (blob.size > 500) {
-                    sendBlobToGemini(blob, seq);
+                    queueBlobForGemini(blob, seq);
                 } else {
                     pendingResultsRef.current.set(seq, '');
                     while (pendingResultsRef.current.has(latestProcessedSeqRef.current + 1)) {
@@ -226,7 +264,7 @@ export const useGeminiSpeechRecognition = ({
         };
 
         loop();
-    }, [processWords]);
+    }, [queueBlobForGemini]);
 
     const start = useCallback(async () => {
         if (isListeningRef.current) return;
@@ -240,6 +278,15 @@ export const useGeminiSpeechRecognition = ({
         pendingResultsRef.current.clear();
 
         try {
+            // Check if there is an existing stream first to ensure clean state
+            if (streamRef.current) {
+                streamRef.current.getTracks().forEach(track => track.stop());
+            }
+
+            requestQueueRef.current = [];
+            backoffDelayRef.current = 1000;
+            isProcessingQueueRef.current = false;
+
             const stream = await navigator.mediaDevices.getUserMedia({
                 audio: {
                     echoCancellation: true,
@@ -271,6 +318,9 @@ export const useGeminiSpeechRecognition = ({
             }
         });
         recordersRef.current = [];
+
+        requestQueueRef.current = [];
+        isProcessingQueueRef.current = false;
 
         if (streamRef.current) {
             streamRef.current.getTracks().forEach(track => track.stop());
