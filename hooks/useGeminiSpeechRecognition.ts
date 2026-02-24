@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { fuzzyMatchWords } from '../utils/textUtils';
 
-const GEMINI_API_KEY = "AIzaSyDxlZqS32sx0ERnxx2CuKPYEHcCqWLjpEA";
+const GEMINI_API_KEY = "AIzaSyCU9G9CsXN_Mu17_VT04gyr5rt4Lau04EE";
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
 interface UseSpeechRecognitionOptions {
