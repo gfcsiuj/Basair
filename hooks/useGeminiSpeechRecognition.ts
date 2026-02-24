@@ -138,6 +138,16 @@ export const useGeminiSpeechRecognition = ({
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(requestBody)
             });
+
+            if (!response.ok) {
+                if (response.status === 429) {
+                    console.warn("تم تجاوز الحد المسموح للطلبات (429). سنقوم بتأخير الطلب القادم.");
+                } else {
+                    console.error("خطأ في الاتصال بالخادم:", response.status);
+                }
+                throw new Error(`HTTP Error: ${response.status}`);
+            }
+
             const data = await response.json();
 
             let transcript = '';
@@ -170,9 +180,10 @@ export const useGeminiSpeechRecognition = ({
     const startRecordingLoop = useCallback(() => {
         if (!isListeningRef.current || !streamRef.current) return;
 
-        // Use 12s chunks, overlapping by 2s (step = 10s)
-        const CHUNK_DURATION = 12000;
-        const STEP_DURATION = 10000;
+        // Use 6s chunks, overlapping by 1s (step = 5s) to ensure we stay under 15 Requests/Min
+        // 60 seconds / 5s = 12 requests per minute (Safe under 15 RPM limit)
+        const CHUNK_DURATION = 6000;
+        const STEP_DURATION = 5000;
 
         const loop = () => {
             if (!isListeningRef.current) return;
