@@ -122,12 +122,15 @@ const transcribeWithWitAi = async (wavBlob: Blob): Promise<string> => {
 
     // Wit.ai /speech endpoint يرجع استجابة NDJSON (سطور JSON متعددة)
     const responseText = await response.text();
+    console.log('🔍 Wit.ai raw response:', responseText);
+
     const lines = responseText.trim().split('\n').filter(Boolean);
 
     let finalText = '';
     for (const line of lines) {
         try {
             const parsed = JSON.parse(line);
+            console.log('🔍 Wit.ai parsed line:', parsed);
             if (parsed.text) {
                 finalText = parsed.text;
             }
@@ -136,6 +139,7 @@ const transcribeWithWitAi = async (wavBlob: Blob): Promise<string> => {
         }
     }
 
+    console.log('📝 Wit.ai final text:', finalText || '(empty)');
     return finalText;
 };
 
@@ -177,7 +181,13 @@ export const useWitAiTracker = ({
         const localIndex = currentIndexRef.current;
         const localExpected = expectedWordsRef.current;
 
-        if (localIndex >= localExpected.length) return;
+        console.log('🎯 Processing:', { spokenWords, localIndex, totalExpected: localExpected.length });
+        console.log('🎯 Next expected words:', localExpected.slice(localIndex, localIndex + 5));
+
+        if (localIndex >= localExpected.length) {
+            console.log('✅ All words matched!');
+            return;
+        }
 
         let matchedCount = 0;
 
@@ -186,8 +196,11 @@ export const useWitAiTracker = ({
             if (targetIndex >= localExpected.length) break;
 
             const expectedWord = localExpected[targetIndex];
+            const isMatch = fuzzyMatchWords(spokenWord, expectedWord);
 
-            if (fuzzyMatchWords(spokenWord, expectedWord)) {
+            console.log(`🔄 Comparing: "${spokenWord}" vs "${expectedWord}" => ${isMatch ? '✅ MATCH' : '❌ NO MATCH'}`);
+
+            if (isMatch) {
                 matchedCount++;
                 onWordMatch?.(targetIndex);
             } else {
@@ -196,6 +209,7 @@ export const useWitAiTracker = ({
                 const searchWindow = Math.min(3, localExpected.length - targetIndex);
                 for (let offset = 1; offset < searchWindow; offset++) {
                     if (fuzzyMatchWords(spokenWord, localExpected[targetIndex + offset])) {
+                        console.log(`🔄 Found ahead at offset ${offset}: "${localExpected[targetIndex + offset]}"`);
                         matchedCount += offset + 1;
                         foundAhead = true;
                         break;
@@ -208,6 +222,7 @@ export const useWitAiTracker = ({
             }
         }
 
+        console.log(`📊 Total matched: ${matchedCount}`);
         if (matchedCount > 0) {
             const newIndex = localIndex + matchedCount;
             setCurrentIndex(newIndex);
