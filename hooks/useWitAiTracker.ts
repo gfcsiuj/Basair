@@ -189,6 +189,7 @@ export const useWitAiTracker = ({
     const mediaStreamRef = useRef<MediaStream | null>(null);
     const audioContextRef = useRef<AudioContext | null>(null);
     const processorRef = useRef<ScriptProcessorNode | null>(null);
+    const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
     const pcmBufferRef = useRef<Float32Array[]>([]);
     const chunkTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const isListeningRef = useRef(false);
@@ -292,6 +293,7 @@ export const useWitAiTracker = ({
             audioContextRef.current = ctx;
 
             const src = ctx.createMediaStreamSource(stream);
+            sourceRef.current = src; // حفظ المرجع لمنع garbage collection
             const proc = ctx.createScriptProcessor(4096, 1, 1);
             processorRef.current = proc;
 
@@ -304,6 +306,10 @@ export const useWitAiTracker = ({
             proc.connect(ctx.destination);
 
             chunkTimerRef.current = setInterval(() => {
+                // التأكد من أن AudioContext لا يزال نشطاً
+                if (audioContextRef.current?.state === 'suspended') {
+                    audioContextRef.current.resume().catch(() => { });
+                }
                 if (isListeningRef.current && pcmBufferRef.current.length > 0) sendChunkToWitAi();
             }, CHUNK_INTERVAL_MS);
 
@@ -324,6 +330,7 @@ export const useWitAiTracker = ({
 
         if (chunkTimerRef.current) { clearInterval(chunkTimerRef.current); chunkTimerRef.current = null; }
         if (pcmBufferRef.current.length > 0) sendChunkToWitAi();
+        if (sourceRef.current) { sourceRef.current.disconnect(); sourceRef.current = null; }
         if (processorRef.current) { processorRef.current.disconnect(); processorRef.current = null; }
         if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
             audioContextRef.current.close().catch(() => { });
