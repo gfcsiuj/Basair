@@ -170,9 +170,9 @@ export const useGeminiSpeechRecognition = ({
     const startRecordingLoop = useCallback(() => {
         if (!isListeningRef.current || !streamRef.current) return;
 
-        // Use 4s chunks, overlapping by 1s (step = 3s)
-        const CHUNK_DURATION = 4000;
-        const STEP_DURATION = 3000;
+        // Use 12s chunks, overlapping by 2s (step = 10s)
+        const CHUNK_DURATION = 12000;
+        const STEP_DURATION = 10000;
 
         const loop = () => {
             if (!isListeningRef.current) return;
