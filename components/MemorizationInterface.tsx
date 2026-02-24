@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useApp } from '../hooks/useApp';
-import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
+import { useGeminiSpeechRecognition } from '../hooks/useGeminiSpeechRecognition';
 import { ReadingMode, AyahWordState, Verse, Word } from '../types';
 import { TOTAL_PAGES } from '../constants';
 import { renderedFontPages } from '../utils/fontPageTracker';
@@ -229,7 +229,7 @@ const MemorizationInterface: React.FC = () => {
         start: startListening,
         stop: stopListening,
         resetIndex,
-    } = useSpeechRecognition({
+    } = useGeminiSpeechRecognition({
         expectedWords: expectedTexts,
         onWordMatch: handleWordMatch,
         onWordMismatch: handleWordMismatch,
