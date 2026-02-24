@@ -57,49 +57,101 @@ const downsample = (buf: Float32Array, inRate: number, outRate: number): Float32
 };
 
 /**
- * تحليل استجابة Wit.ai - تدعم JSON عادي و NDJSON
+ * قراءة استجابة Wit.ai بالكامل (تدعم الاستجابات المتدفقة chunked)
  */
-const parseWitResponse = (responseText: string): { tokens: string[], text: string } => {
-    let tokens: string[] = [];
-    let text = '';
+const readFullResponse = async (response: Response): Promise<string> => {
+    // Try reading with the stream reader for chunked responses
+    const reader = response.body?.getReader();
+    if (!reader) {
+        return await response.text();
+    }
 
-    // أولاً: محاولة تحليل الاستجابة كاملة كـ JSON واحد
+    const decoder = new TextDecoder();
+    let fullText = '';
+
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        fullText += decoder.decode(value, { stream: true });
+    }
+    // Flush decoder
+    fullText += decoder.decode();
+
+    return fullText;
+};
+
+/**
+ * تحليل استجابة Wit.ai واستخراج الكلمات
+ */
+const extractWordsFromResponse = (responseText: string): string[] => {
+    console.log('🔍 Raw response length:', responseText.length);
+    console.log('🔍 Raw response:', responseText.substring(0, 500));
+
+    // البحث عن كل كائنات JSON في النص (قد تكون متعددة أو واحدة)
+    const jsonObjects: any[] = [];
+
+    // محاولة 1: JSON واحد كامل
     try {
         const parsed = JSON.parse(responseText);
-        if (parsed.tokens && Array.isArray(parsed.tokens)) {
-            tokens = parsed.tokens
+        jsonObjects.push(parsed);
+    } catch {
+        // محاولة 2: NDJSON - أسطر JSON متعددة
+        // نبحث عن كائنات JSON كاملة باستخدام عداد الأقواس
+        let depth = 0;
+        let start = -1;
+
+        for (let i = 0; i < responseText.length; i++) {
+            const ch = responseText[i];
+            if (ch === '{') {
+                if (depth === 0) start = i;
+                depth++;
+            } else if (ch === '}') {
+                depth--;
+                if (depth === 0 && start !== -1) {
+                    try {
+                        const obj = JSON.parse(responseText.substring(start, i + 1));
+                        jsonObjects.push(obj);
+                    } catch {
+                        // skip
+                    }
+                    start = -1;
+                }
+            }
+        }
+    }
+
+    console.log('🔍 Found JSON objects:', jsonObjects.length);
+
+    let bestTokens: string[] = [];
+    let bestText = '';
+
+    for (const obj of jsonObjects) {
+        // البحث عن tokens في كل المسارات الممكنة
+        const tokensArray = obj.tokens
+            || obj.speech?.tokens
+            || obj.audio?.tokens
+            || null;
+
+        if (tokensArray && Array.isArray(tokensArray)) {
+            const extracted = tokensArray
                 .map((t: any) => (t.token || t.value || t.text || '') as string)
                 .filter(Boolean);
+            if (extracted.length > bestTokens.length) {
+                bestTokens = extracted;
+            }
         }
-        if (parsed.text) {
-            text = parsed.text;
-        }
-        console.log('🔍 Parsed as single JSON - tokens:', tokens, 'text:', text);
-        return { tokens, text };
-    } catch {
-        // ليست JSON واحد، نحاول NDJSON
-    }
 
-    // ثانياً: محاولة تحليل كـ NDJSON (سطور JSON متعددة)
-    const lines = responseText.trim().split('\n').filter(Boolean);
-    for (const line of lines) {
-        try {
-            const parsed = JSON.parse(line);
-            if (parsed.tokens && Array.isArray(parsed.tokens)) {
-                tokens = parsed.tokens
-                    .map((t: any) => (t.token || t.value || t.text || '') as string)
-                    .filter(Boolean);
-            }
-            if (parsed.text) {
-                text = parsed.text;
-            }
-        } catch {
-            // تجاهل السطر
+        if (obj.text && obj.text.length > bestText.length) {
+            bestText = obj.text;
         }
     }
 
-    console.log('🔍 Parsed as NDJSON - tokens:', tokens, 'text:', text);
-    return { tokens, text };
+    console.log('🔍 Best tokens:', bestTokens, 'Best text:', bestText);
+
+    // استخدام tokens إذا متاحة، وإلا تقسيم النص
+    const result = bestTokens.length > 0 ? bestTokens : bestText.split(/\s+/).filter(Boolean);
+    console.log('📝 Final words:', result);
+    return result;
 };
 
 const transcribeWithWitAi = async (wavBlob: Blob): Promise<string[]> => {
@@ -118,13 +170,9 @@ const transcribeWithWitAi = async (wavBlob: Blob): Promise<string[]> => {
         return [];
     }
 
-    const responseText = await response.text();
-    const { tokens, text } = parseWitResponse(responseText);
-
-    // استخدام tokens إذا متاحة، وإلا تقسيم النص
-    const result = tokens.length > 0 ? tokens : text.split(/\s+/).filter(Boolean);
-    console.log('📝 Wit.ai final words:', result);
-    return result;
+    // قراءة الاستجابة بالكامل (بما في ذلك الـ chunks)
+    const responseText = await readFullResponse(response);
+    return extractWordsFromResponse(responseText);
 };
 
 export const useWitAiTracker = ({
@@ -183,7 +231,6 @@ export const useWitAiTracker = ({
                 for (let off = 1; off < searchWin; off++) {
                     if (fuzzyMatchWords(spokenWord, localExpected[targetIndex + off], 0.5)) {
                         console.log(`🔄 Found at +${off}: "${localExpected[targetIndex + off]}"`);
-                        // Mark skipped words
                         for (let s = 0; s < off; s++) {
                             onWordMatch?.(targetIndex + s);
                         }
