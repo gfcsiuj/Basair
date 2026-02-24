@@ -1,81 +1,190 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useApp } from '../hooks/useApp';
-import { useWitAiTracker } from '../hooks/useWitAiTracker';
+import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import { ReadingMode, AyahWordState, Verse, Word } from '../types';
 import { TOTAL_PAGES } from '../constants';
+import { renderedFontPages } from '../utils/fontPageTracker';
+import '../styles/recitation.css';
 
-// ─────────────────────────────────────────────────────────────────────
-// مكون الكلمة المحسّن - يستخدم React.memo لتجنب إعادة التصيير الزائدة
-// فقط يتم إعادة تصيير الكلمة التي تغيّرت حالتها
-// ─────────────────────────────────────────────────────────────────────
-const WordComponent = React.memo(({ word, wordState, isCurrent }: { word: Word, wordState: AyahWordState, isCurrent: boolean }) => {
+// ═══════════════════════════════════════════════════════════════
+// مكون الكلمة — يعرض كل كلمة بخط القرآن مع التأثيرات البصرية
+// ═══════════════════════════════════════════════════════════════
+const RecitationWord = React.memo(({
+    displayText,
+    placeholderText,
+    wordState,
+    isCurrent,
+}: {
+    displayText: string;
+    placeholderText: string;
+    wordState: AyahWordState;
+    isCurrent: boolean;
+}) => {
     let content: React.ReactNode;
-    let wrapperClass = "transition-all duration-300 ease-in-out inline-block relative mx-1 my-2 px-2 py-1 rounded-md";
-
-    const placeholderText = word.text_uthmani || 'الله';
+    let className = 'recitation-word';
 
     switch (wordState) {
         case AyahWordState.Correct:
-        case AyahWordState.Revealed:
+            content = displayText;
+            className += ' recitation-word--correct';
+            break;
         case AyahWordState.Skipped:
-            content = word.text_uthmani || '...';
+            content = displayText;
+            className += ' recitation-word--skipped';
+            break;
+        case AyahWordState.Revealed:
+            content = displayText;
+            className += ' recitation-word--revealed';
             break;
         case AyahWordState.Hinted:
-            const hintChar = word?.text_uthmani?.charAt(0);
-            content = (hintChar || '.') + '..';
+            // إظهار أول حرفين فقط
+            const hint = displayText.substring(0, 2) + '...';
+            content = hint;
+            className += ' recitation-word--hinted';
             break;
-        default: // Hidden, Waiting, Incorrect
-            content = <span className="opacity-0">{placeholderText}</span>;
+        case AyahWordState.Incorrect:
+            content = <span style={{ opacity: 0 }}>{placeholderText}</span>;
+            className += ' recitation-word--incorrect';
+            break;
+        default: // Hidden, Waiting
+            content = <span style={{ opacity: 0 }}>{placeholderText}</span>;
+            className += ' recitation-word--hidden';
             break;
     }
 
-    if (isCurrent && (wordState === AyahWordState.Waiting || wordState === AyahWordState.Hidden)) {
-        wrapperClass += " animate-pulseWaiting bg-bg-tertiary";
-    } else {
-        switch (wordState) {
-            case AyahWordState.Incorrect: wrapperClass += " bg-red-500/30"; break;
-            case AyahWordState.Correct: wrapperClass += " bg-green-500/20"; break;
-            case AyahWordState.Skipped: wrapperClass += " bg-amber-500/20"; break;
-            case AyahWordState.Revealed:
-            case AyahWordState.Hinted: wrapperClass += " bg-blue-500/20"; break;
-            default: wrapperClass += " bg-bg-tertiary"; break;
-        }
+    if (isCurrent && (wordState === AyahWordState.Hidden || wordState === AyahWordState.Waiting)) {
+        className += ' recitation-word--current';
     }
 
-    return <span className={wrapperClass}>{content}</span>;
+    return <span className={className}>{content}</span>;
 });
 
-
-// ─────────────────────────────────────────────────────────────────────
-// مكون واجهة التحفيظ الرئيسي
-// ─────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// واجهة التسميع الرئيسية
+// ═══════════════════════════════════════════════════════════════
 const MemorizationInterface: React.FC = () => {
     const { state, actions } = useApp();
     const [wordStates, setWordStates] = useState<AyahWordState[]>([]);
+    const [showCompletion, setShowCompletion] = useState(false);
     const touchStartX = useRef(0);
     const touchStartY = useRef(0);
+    const currentWordRef = useRef<HTMLDivElement>(null);
+    const mainRef = useRef<HTMLElement>(null);
 
-    // ─── استخراج جميع الكلمات من بيانات الصفحة ───
-    const allWords = useMemo(() => {
-        const verses = [...(state.pageData.right || []), ...(state.pageData.left || [])];
-        return verses.flatMap(verse =>
-            verse.words.filter(w => w.char_type_name === 'word')
-        );
+    // ─── إعداد خط الصفحة (QPC) ───
+    const currentPage = state.currentPage;
+    const font = state.font;
+
+    useEffect(() => {
+        if (font !== 'qpc-v1' || currentPage <= 0) return;
+
+        const styleId = `dynamic-quran-font-style-recitation-${currentPage}`;
+        let styleEl = document.getElementById(styleId) as HTMLStyleElement;
+
+        if (!styleEl) {
+            styleEl = document.createElement('style');
+            styleEl.id = styleId;
+            document.head.appendChild(styleEl);
+        }
+
+        const cssRule = `
+            @font-face {
+                font-family: 'QuranPageFontV2-${currentPage}';
+                src: url('/QPC V2 Font/p${currentPage}.ttf') format('truetype');
+                font-display: block;
+            }
+        `;
+        if (styleEl.innerHTML !== cssRule) {
+            styleEl.innerHTML = cssRule;
+        }
+
+        // تحميل الخط
+        const fontSpec = `1em QuranPageFontV2-${currentPage}`;
+        if (!document.fonts.check(fontSpec)) {
+            document.fonts.load(fontSpec).then(() => {
+                renderedFontPages.add(currentPage);
+            }).catch(() => {
+                renderedFontPages.add(currentPage);
+            });
+        }
+    }, [currentPage, font]);
+
+    // ─── استخراج الآيات والكلمات ───
+    const verses = useMemo(() => {
+        return [...(state.pageData.right || []), ...(state.pageData.left || [])];
     }, [state.pageData]);
+
+    // ─── بناء بيانات الكلمات مع نصوص QPC ───
+    const wordsData = useMemo(() => {
+        const result: {
+            word: Word;
+            verse: Verse;
+            qpcText: string; // نص QPC للعرض
+            uthmaniText: string; // نص عثماني للمقارنة
+        }[] = [];
+
+        for (const verse of verses) {
+            const verseWords = verse.words.filter(w => w.char_type_name === 'word');
+
+            if (font === 'qpc-v1' && state.wordGlyphData) {
+                // استخدام بيانات QPC glyph
+                const verseKeyPrefix = `${verse.chapter_id}:${verse.verse_number}:`;
+                const qpcWords = Object.entries(state.wordGlyphData)
+                    .filter(([key]) => key.startsWith(verseKeyPrefix))
+                    .map(([key, wordInfo]) => ({
+                        id: wordInfo.id,
+                        text: wordInfo.text,
+                        position: parseInt(key.split(':')[2], 10),
+                    }))
+                    .sort((a, b) => a.position - b.position);
+
+                // ربط كلمات QPC مع كلمات API
+                for (let i = 0; i < Math.min(verseWords.length, qpcWords.length); i++) {
+                    result.push({
+                        word: verseWords[i],
+                        verse,
+                        qpcText: qpcWords[i].text,
+                        uthmaniText: verseWords[i].text_uthmani || '',
+                    });
+                }
+
+                // أي كلمات إضافية لم تُربط
+                for (let i = qpcWords.length; i < verseWords.length; i++) {
+                    result.push({
+                        word: verseWords[i],
+                        verse,
+                        qpcText: verseWords[i].text_uthmani || '',
+                        uthmaniText: verseWords[i].text_uthmani || '',
+                    });
+                }
+            } else {
+                // بدون QPC — استخدام text_uthmani مباشرة
+                for (const w of verseWords) {
+                    result.push({
+                        word: w,
+                        verse,
+                        qpcText: w.text_uthmani || '',
+                        uthmaniText: w.text_uthmani || '',
+                    });
+                }
+            }
+        }
+
+        return result;
+    }, [verses, font, state.wordGlyphData]);
 
     // ─── النصوص المتوقعة للمقارنة الصوتية ───
     const expectedTexts = useMemo(() => {
-        return allWords.map(w => w.text_uthmani || '');
-    }, [allWords]);
+        return wordsData.map(w => w.uthmaniText);
+    }, [wordsData]);
 
-    // ─── استدعاءات المطابقة (Callbacks) ───
+    // ─── Callbacks ───
     const handleWordMatch = useCallback((index: number) => {
         setWordStates(prev => {
             const newStates = [...prev];
             if (index < newStates.length) {
                 newStates[index] = AyahWordState.Correct;
             }
-            // تطبيق حالة "Skipped" للكلمات المتخطاة بين آخر كلمة صحيحة والحالية
             for (let i = 0; i < index; i++) {
                 if (newStates[i] === AyahWordState.Hidden || newStates[i] === AyahWordState.Waiting) {
                     newStates[i] = AyahWordState.Skipped;
@@ -83,6 +192,8 @@ const MemorizationInterface: React.FC = () => {
             }
             return newStates;
         });
+        // اهتزاز خفيف عند المطابقة
+        try { navigator.vibrate(15); } catch { }
         actions.addMemorizationPoints(10);
     }, [actions]);
 
@@ -94,179 +205,195 @@ const MemorizationInterface: React.FC = () => {
             }
             return newStates;
         });
+        // اهتزاز أقوى عند الخطأ
+        try { navigator.vibrate([30, 50, 30]); } catch { }
         actions.addMemorizationPoints(-5);
 
-        // إعادة الحالة بعد فترة قصيرة
         setTimeout(() => {
             setWordStates(prev => {
-                const restoredStates = [...prev];
-                if (index < restoredStates.length && restoredStates[index] === AyahWordState.Incorrect) {
-                    restoredStates[index] = AyahWordState.Hidden;
+                const restored = [...prev];
+                if (index < restored.length && restored[index] === AyahWordState.Incorrect) {
+                    restored[index] = AyahWordState.Hidden;
                 }
-                return restoredStates;
+                return restored;
             });
         }, 800);
     }, [actions]);
 
-    // ─── Hook التسميع عبر Wit.ai ───
+    // ─── Hook التعرف على الكلام ───
     const {
         currentIndex,
         isListening,
         isLoading,
+        isSupported,
         start: startListening,
         stop: stopListening,
         resetIndex,
-    } = useWitAiTracker({
+    } = useSpeechRecognition({
         expectedWords: expectedTexts,
         onWordMatch: handleWordMatch,
         onWordMismatch: handleWordMismatch,
     });
 
-    // ─── إعادة تعيين الحالة عند تغيّر الصفحة ───
+    // ─── إعادة تعيين عند تغيّر الصفحة ───
     useEffect(() => {
         stopListening();
-        setWordStates(allWords.map(() => AyahWordState.Hidden));
+        setWordStates(wordsData.map(() => AyahWordState.Hidden));
+        setShowCompletion(false);
         resetIndex();
 
         const timer = setTimeout(() => {
-            startListening();
-        }, 500);
+            if (isSupported) startListening();
+        }, 600);
 
         return () => {
             clearTimeout(timer);
             stopListening();
         };
-    }, [allWords]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [wordsData.length, currentPage]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // ─── الانتقال التلقائي للصفحة التالية عند إكمال الصفحة ───
+    // ─── تمرير تلقائي للكلمة الحالية ───
     useEffect(() => {
-        if (currentIndex > 0 && currentIndex === allWords.length && allWords.length > 0) {
-            if (state.currentPage < TOTAL_PAGES) {
-                actions.addMemorizationPoints(100);
-                const pageTurnTimeout = setTimeout(() => {
-                    actions.loadPage(state.currentPage + 1);
-                }, 1500);
-                return () => clearTimeout(pageTurnTimeout);
+        if (currentIndex > 0 && mainRef.current) {
+            const wordElements = mainRef.current.querySelectorAll('.recitation-word');
+            const targetEl = wordElements[currentIndex];
+            if (targetEl) {
+                targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
         }
-    }, [currentIndex, allWords.length, state.currentPage, actions]);
+    }, [currentIndex]);
+
+    // ─── إكمال الصفحة ───
+    useEffect(() => {
+        if (currentIndex > 0 && currentIndex >= wordsData.length && wordsData.length > 0) {
+            setShowCompletion(true);
+            actions.addMemorizationPoints(100);
+
+            const timer = setTimeout(() => {
+                if (currentPage < TOTAL_PAGES) {
+                    actions.loadPage(currentPage + 1);
+                }
+            }, 2500);
+            return () => clearTimeout(timer);
+        }
+    }, [currentIndex, wordsData.length, currentPage, actions]);
 
     // ─── التنقل بالأسهم ───
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'ArrowLeft' && state.currentPage < TOTAL_PAGES) {
-                actions.loadPage(state.currentPage + 1);
-            } else if (e.key === 'ArrowRight' && state.currentPage > 1) {
-                actions.loadPage(state.currentPage - 1);
+            if (e.key === 'ArrowLeft' && currentPage < TOTAL_PAGES) {
+                actions.loadPage(currentPage + 1);
+            } else if (e.key === 'ArrowRight' && currentPage > 1) {
+                actions.loadPage(currentPage - 1);
             }
         };
-
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [actions, state.currentPage]);
+    }, [actions, currentPage]);
 
-    // ─── التنقل بالسحب (Swipe) ───
-    const handleTouchStart = (e: React.TouchEvent<HTMLElement>) => {
+    // ─── التنقل بالسحب ───
+    const handleTouchStart = (e: React.TouchEvent) => {
         touchStartX.current = e.touches[0].clientX;
         touchStartY.current = e.touches[0].clientY;
     };
 
-    const handleTouchEnd = (e: React.TouchEvent<HTMLElement>) => {
-        const touchEndX = e.changedTouches[0].clientX;
-        const touchEndY = e.changedTouches[0].clientY;
-        const diffX = touchEndX - touchStartX.current;
-        const diffY = Math.abs(touchEndY - touchStartY.current);
-
-        if (Math.abs(diffX) > 50 && diffY < 100) {
-            if (diffX > 0 && state.currentPage > 1) {
-                actions.loadPage(state.currentPage - 1);
-            } else if (diffX < 0 && state.currentPage < TOTAL_PAGES) {
-                actions.loadPage(state.currentPage + 1);
-            }
+    const handleTouchEnd = (e: React.TouchEvent) => {
+        const dx = e.changedTouches[0].clientX - touchStartX.current;
+        const dy = Math.abs(e.changedTouches[0].clientY - touchStartY.current);
+        if (Math.abs(dx) > 50 && dy < 100) {
+            if (dx > 0 && currentPage > 1) actions.loadPage(currentPage - 1);
+            else if (dx < 0 && currentPage < TOTAL_PAGES) actions.loadPage(currentPage + 1);
         }
     };
 
     // ─── أزرار التحكم ───
     const handleHint = () => {
-        if (currentIndex < allWords.length) {
+        if (currentIndex < wordsData.length) {
             setWordStates(prev => {
-                const newStates = [...prev];
-                if (newStates[currentIndex] === AyahWordState.Hinted) {
-                    newStates[currentIndex] = AyahWordState.Hidden;
-                } else {
-                    newStates[currentIndex] = AyahWordState.Hinted;
-                }
-                return newStates;
+                const s = [...prev];
+                s[currentIndex] = s[currentIndex] === AyahWordState.Hinted
+                    ? AyahWordState.Hidden
+                    : AyahWordState.Hinted;
+                return s;
             });
         }
     };
 
     const handleSkip = () => {
-        if (currentIndex < allWords.length) {
-            setWordStates(prev => {
-                const newStates = [...prev];
-                newStates[currentIndex] = AyahWordState.Skipped;
-                return newStates;
-            });
-            // ملاحظة: الـ currentIndex يُدار من الـ hook
-            // لكن نحتاج لطريقة لتخطي الكلمة - نستدعي onWordMatch كبديل
+        if (currentIndex < wordsData.length) {
             handleWordMatch(currentIndex);
         }
     };
 
     const handleRevealAyah = () => {
-        const verses = [...(state.pageData.right || []), ...(state.pageData.left || [])];
         if (verses.length === 0) return;
-
         let wordCounter = 0;
-
         for (const verse of verses) {
-            const verseWordCount = verse.words.filter(w => w.char_type_name === 'word').length;
-            if (currentIndex >= wordCounter && currentIndex < wordCounter + verseWordCount) {
-                const firstWordOfVerseIndex = wordCounter;
-                const isAlreadyRevealed = wordStates[firstWordOfVerseIndex] === AyahWordState.Revealed;
-
+            const count = verse.words.filter(w => w.char_type_name === 'word').length;
+            if (currentIndex >= wordCounter && currentIndex < wordCounter + count) {
+                const isRevealed = wordStates[wordCounter] === AyahWordState.Revealed;
                 setWordStates(prev => {
-                    const newStates = [...prev];
-                    for (let i = 0; i < verseWordCount; i++) {
-                        const indexToUpdate = wordCounter + i;
-                        if (indexToUpdate < newStates.length) {
-                            newStates[indexToUpdate] = isAlreadyRevealed ? AyahWordState.Hidden : AyahWordState.Revealed;
+                    const s = [...prev];
+                    for (let i = 0; i < count; i++) {
+                        const idx = wordCounter + i;
+                        if (idx < s.length) {
+                            s[idx] = isRevealed ? AyahWordState.Hidden : AyahWordState.Revealed;
                         }
                     }
-                    return newStates;
+                    return s;
                 });
                 break;
             }
-            wordCounter += verseWordCount;
+            wordCounter += count;
         }
     };
 
     const handleReset = () => {
         resetIndex();
-        setWordStates(allWords.map(() => AyahWordState.Hidden));
+        setWordStates(wordsData.map(() => AyahWordState.Hidden));
+        setShowCompletion(false);
     };
 
     // ─── حساب التقدم ───
-    let globalWordCounter = 0;
-    const surah = state.pageData?.right?.[0] || state.pageData?.left?.[0] ? state.surahs.find(s => s.id === (state.pageData.right?.[0] || state.pageData.left?.[0])!.chapter_id) : null;
+    const surah = verses[0] ? state.surahs.find(s => s.id === verses[0].chapter_id) : null;
+    const correctCount = wordStates.filter(s =>
+        s === AyahWordState.Correct || s === AyahWordState.Skipped || s === AyahWordState.Revealed
+    ).length;
+    const progress = wordsData.length > 0 ? (correctCount / wordsData.length) * 100 : 0;
 
-    const correctWords = wordStates.filter(s => s === AyahWordState.Correct || s === AyahWordState.Skipped || s === AyahWordState.Revealed).length;
-    const progress = allWords.length > 0 ? (correctWords / allWords.length) * 100 : 0;
+    // ─── نمط الخط ───
+    const fontStyle: React.CSSProperties = font === 'qpc-v1' ? {
+        fontFamily: `QuranPageFontV2-${currentPage}`,
+        fontSize: `${state.fontSize + 4}px`,
+        lineHeight: 2.8,
+        direction: 'rtl',
+    } : {
+        fontFamily: "'Noto Naskh Arabic', 'Traditional Arabic', serif",
+        fontSize: `${state.fontSize + 2}px`,
+        lineHeight: 3,
+        direction: 'rtl',
+    };
 
-    // ─────────────────────────────────────────────────────────────────
-    // العرض (Render)
-    // ─────────────────────────────────────────────────────────────────
+    // ─── تجميع الكلمات حسب الآيات ───
+    let globalIndex = 0;
+
+    // ═══════════════════════════════════════════════════════════
+    // العرض
+    // ═══════════════════════════════════════════════════════════
     return (
         <div className="flex flex-col h-full w-full bg-bg-secondary">
             {/* ═══ الهيدر ═══ */}
-            <header className="bg-bg-primary border-b border-border shadow-sm z-10 shrink-0">
+            <header className="recitation-header bg-bg-primary border-b border-border shadow-sm z-10 shrink-0">
                 <div
                     className="flex items-center justify-between px-4 pb-3"
                     style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top, 0rem))' }}
                 >
+                    {/* يسار — رجوع + النقاط */}
                     <div className="flex items-center gap-2">
-                        <button onClick={() => actions.setReadingMode(ReadingMode.Reading)} className="p-2 rounded-lg text-text-secondary hover:bg-bg-tertiary transition-colors">
+                        <button
+                            onClick={() => { stopListening(); actions.setReadingMode(ReadingMode.Reading); }}
+                            className="p-2 rounded-lg text-text-secondary hover:bg-bg-tertiary transition-colors"
+                        >
                             <i className="fas fa-arrow-right text-lg"></i>
                         </button>
                         <div className="flex items-center gap-1 text-amber-500">
@@ -274,59 +401,95 @@ const MemorizationInterface: React.FC = () => {
                             <span className="font-bold text-sm">{state.memorizationStats.points}</span>
                         </div>
                     </div>
-                    <div>
-                        <h1 className="text-sm font-bold text-center text-text-primary">وضع التحفيظ</h1>
-                        <p className="text-xs text-center text-text-secondary">{surah?.name_arabic} - صفحة {state.currentPage}</p>
+
+                    {/* وسط — العنوان */}
+                    <div className="text-center">
+                        <h1 className="text-sm font-bold text-text-primary">وضع التحفيظ</h1>
+                        <p className="text-xs text-text-secondary">
+                            {surah?.name_arabic} — صفحة {currentPage}
+                        </p>
                     </div>
+
+                    {/* يمين — السلسلة + حالة الميكروفون */}
                     <div className="flex items-center gap-3">
                         <div className="flex items-center gap-1 text-red-500">
                             <i className="fas fa-fire"></i>
                             <span className="font-bold text-sm">{state.memorizationStats.streak}</span>
                         </div>
-                        <div className="w-8 h-8 flex items-center justify-center text-lg">
+                        <div className="w-8 h-8 flex items-center justify-center">
                             {isLoading ? (
-                                <i className="fas fa-spinner fa-spin text-primary"></i>
+                                <i className="fas fa-spinner fa-spin text-primary text-lg"></i>
                             ) : isListening ? (
-                                <i className="fas fa-microphone text-primary animate-pulse"></i>
+                                <i className="fas fa-microphone text-green-500 text-lg animate-pulse"></i>
                             ) : (
-                                <i className="fas fa-microphone-slash text-red-500"></i>
+                                <i className="fas fa-microphone-slash text-red-400 text-lg"></i>
                             )}
                         </div>
                     </div>
                 </div>
+
                 {/* شريط التقدم */}
-                <div className="w-full bg-bg-tertiary h-1.5">
-                    <div
-                        className="bg-primary h-1.5 rounded-r-full transition-all duration-500 ease-out"
-                        style={{ width: `${progress}%` }}
-                    ></div>
+                <div className="w-full bg-bg-tertiary h-1">
+                    <div className="recitation-progress-bar" style={{ width: `${progress}%` }}></div>
                 </div>
             </header>
 
-            {/* ═══ المحتوى الرئيسي - النص القرآني ═══ */}
+            {/* ═══ المحتوى الرئيسي ═══ */}
             <main
+                ref={mainRef}
                 className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-8"
                 onTouchStart={handleTouchStart}
                 onTouchEnd={handleTouchEnd}
             >
-                <div className={`font-noto text-right`} style={{ fontSize: `${state.fontSize + 2}px`, lineHeight: 3 }}>
-                    {[...(state.pageData.right || []), ...(state.pageData.left || [])].map(verse => (
-                        <React.Fragment key={verse.verse_key}>
-                            {verse.words.filter(w => w.char_type_name === 'word').map((word) => {
-                                const myIndex = globalWordCounter;
-                                globalWordCounter++;
-                                return <WordComponent
-                                    key={`${word.id}-${myIndex}`}
-                                    word={word}
-                                    wordState={wordStates[myIndex] || AyahWordState.Hidden}
-                                    isCurrent={myIndex === currentIndex && isListening}
-                                />;
-                            })}
-                            <span className="verse-number inline-flex items-center justify-center w-8 h-8 bg-primary/10 text-primary text-sm rounded-full font-ui mx-1 select-none">
-                                {new Intl.NumberFormat('ar-EG').format(verse.verse_number)}
-                            </span>
-                        </React.Fragment>
-                    ))}
+                {!isSupported && (
+                    <div className="recitation-unsupported mb-4">
+                        <i className="fas fa-exclamation-triangle text-2xl text-amber-600 mb-2"></i>
+                        <p className="font-bold text-amber-800">المتصفح لا يدعم التعرف على الكلام</p>
+                        <p className="text-sm text-amber-700 mt-1">
+                            يرجى استخدام متصفح Google Chrome للحصول على أفضل تجربة
+                        </p>
+                    </div>
+                )}
+
+                {showCompletion && (
+                    <div className="recitation-completion text-center py-6 mb-4">
+                        <div className="text-4xl mb-2">🎉</div>
+                        <h2 className="text-xl font-bold text-green-600">أحسنت!</h2>
+                        <p className="text-sm text-text-secondary mt-1">
+                            أكملت الصفحة بنجاح — جاري الانتقال للصفحة التالية...
+                        </p>
+                    </div>
+                )}
+
+                <div className="text-right" style={fontStyle}>
+                    {verses.map(verse => {
+                        const verseWords = verse.words.filter(w => w.char_type_name === 'word');
+                        const wordElements = verseWords.map((_, i) => {
+                            const idx = globalIndex;
+                            globalIndex++;
+                            const wd = wordsData[idx];
+                            if (!wd) return null;
+
+                            return (
+                                <RecitationWord
+                                    key={`${wd.word.id}-${idx}`}
+                                    displayText={wd.qpcText}
+                                    placeholderText={wd.qpcText}
+                                    wordState={wordStates[idx] || AyahWordState.Hidden}
+                                    isCurrent={idx === currentIndex && isListening}
+                                />
+                            );
+                        });
+
+                        return (
+                            <React.Fragment key={verse.verse_key}>
+                                {wordElements}
+                                <span className="recitation-verse-number">
+                                    {new Intl.NumberFormat('ar-EG').format(verse.verse_number)}
+                                </span>
+                            </React.Fragment>
+                        );
+                    })}
                 </div>
             </main>
 
@@ -336,24 +499,30 @@ const MemorizationInterface: React.FC = () => {
                 style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0rem))' }}
             >
                 <div className="flex justify-center items-center gap-2">
-                    <button onClick={handleHint} className="flex flex-col items-center p-2 rounded-lg text-text-secondary hover:bg-bg-tertiary w-20">
-                        <i className="fas fa-lightbulb text-xl mb-1"></i>
-                        <span className="text-xs">تلميح</span>
+                    <button onClick={handleReset} className="recitation-toolbar-btn">
+                        <i className="fas fa-undo"></i>
+                        <span>إعادة</span>
                     </button>
-                    <button onClick={handleSkip} className="flex flex-col items-center p-2 rounded-lg text-text-secondary hover:bg-bg-tertiary w-20">
-                        <i className="fas fa-forward-step text-xl mb-1"></i>
-                        <span className="text-xs">تخطي</span>
+                    <button onClick={handleRevealAyah} className="recitation-toolbar-btn">
+                        <i className="fas fa-eye"></i>
+                        <span>كشف</span>
                     </button>
-                    <button onClick={isListening ? stopListening : startListening} className={`mx-2 w-16 h-16 rounded-full flex items-center justify-center text-white transition-colors ${isListening ? 'bg-red-500 hover:bg-red-600' : 'bg-primary hover:bg-primary-dark'}`}>
+
+                    {/* زر الميكروفون الكبير */}
+                    <button
+                        onClick={isListening ? stopListening : startListening}
+                        className={`recitation-mic-btn mx-2 ${isListening ? 'recitation-mic-btn--active' : 'recitation-mic-btn--inactive'}`}
+                    >
                         <i className={`fas ${isListening ? 'fa-stop' : 'fa-microphone'} text-2xl`}></i>
                     </button>
-                    <button onClick={handleRevealAyah} className="flex flex-col items-center p-2 rounded-lg text-text-secondary hover:bg-bg-tertiary w-20">
-                        <i className="fas fa-eye text-xl mb-1"></i>
-                        <span className="text-xs">كشف</span>
+
+                    <button onClick={handleHint} className="recitation-toolbar-btn">
+                        <i className="fas fa-lightbulb"></i>
+                        <span>تلميح</span>
                     </button>
-                    <button onClick={handleReset} className="flex flex-col items-center p-2 rounded-lg text-text-secondary hover:bg-bg-tertiary w-20">
-                        <i className="fas fa-undo text-xl mb-1"></i>
-                        <span className="text-xs">إعادة</span>
+                    <button onClick={handleSkip} className="recitation-toolbar-btn">
+                        <i className="fas fa-forward-step"></i>
+                        <span>تخطي</span>
                     </button>
                 </div>
             </footer>
