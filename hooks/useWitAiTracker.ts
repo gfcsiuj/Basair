@@ -1,7 +1,7 @@
 /**
  * useWitAiTracker - Custom Hook للتسميع الصوتي باستخدام Wit.ai
  * 
- * يسجل صوت المستخدم عبر MediaRecorder ويرسل مقاطع صوتية كل ~3 ثوانٍ
+ * يسجل صوت المستخدم عبر AudioContext (PCM مباشر) ويرسل مقاطع WAV كل ~4 ثوانٍ
  * إلى Wit.ai API للتعرف على الكلام العربي، ثم يقارن النتائج مع الكلمات المتوقعة.
  */
 import { useState, useRef, useCallback, useEffect } from 'react';
@@ -10,8 +10,11 @@ import { normalizeArabicText, fuzzyMatchWords } from '../utils/textUtils';
 // توكن Wit.ai من متغيرات البيئة
 const WIT_AI_TOKEN = import.meta.env.VITE_WIT_AI_TOKEN as string;
 
-// مدة كل مقطع صوتي بالمللي ثانية (3 ثوانٍ)
-const CHUNK_INTERVAL_MS = 3000;
+// مدة كل مقطع صوتي بالمللي ثانية (4 ثوانٍ)
+const CHUNK_INTERVAL_MS = 4000;
+
+// معدل العينات المطلوب
+const SAMPLE_RATE = 16000;
 
 interface UseWitAiTrackerOptions {
     /** مصفوفة الكلمات المتوقعة (نص الآية مقسّم إلى كلمات) */
@@ -38,32 +41,38 @@ interface UseWitAiTrackerReturn {
 }
 
 /**
- * إرسال مقطع صوتي إلى Wit.ai واستقبال النص
+ * تحويل عينات Float32 إلى ملف WAV (Blob)
  */
 const encodeWAV = (samples: Float32Array, sampleRate: number): Blob => {
     const buffer = new ArrayBuffer(44 + samples.length * 2);
     const view = new DataView(buffer);
 
-    const writeString = (view: DataView, offset: number, string: string) => {
-        for (let i = 0; i < string.length; i++) {
-            view.setUint8(offset + i, string.charCodeAt(i));
+    const writeString = (offset: number, str: string) => {
+        for (let i = 0; i < str.length; i++) {
+            view.setUint8(offset + i, str.charCodeAt(i));
         }
     };
 
-    writeString(view, 0, 'RIFF');
+    // RIFF header
+    writeString(0, 'RIFF');
     view.setUint32(4, 36 + samples.length * 2, true);
-    writeString(view, 8, 'WAVE');
-    writeString(view, 12, 'fmt ');
-    view.setUint32(16, 16, true);
-    view.setUint16(20, 1, true); // PCM
-    view.setUint16(22, 1, true); // 1 channel
-    view.setUint32(24, sampleRate, true);
-    view.setUint32(28, sampleRate * 2, true);
-    view.setUint16(32, 2, true);
-    view.setUint16(34, 16, true);
-    writeString(view, 36, 'data');
+    writeString(8, 'WAVE');
+
+    // fmt sub-chunk
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true);       // sub-chunk size
+    view.setUint16(20, 1, true);        // PCM format
+    view.setUint16(22, 1, true);        // mono
+    view.setUint32(24, sampleRate, true); // sample rate
+    view.setUint32(28, sampleRate * 2, true); // byte rate
+    view.setUint16(32, 2, true);        // block align
+    view.setUint16(34, 16, true);       // bits per sample
+
+    // data sub-chunk
+    writeString(36, 'data');
     view.setUint32(40, samples.length * 2, true);
 
+    // Write PCM samples
     let offset = 44;
     for (let i = 0; i < samples.length; i++, offset += 2) {
         const s = Math.max(-1, Math.min(1, samples[i]));
@@ -73,24 +82,45 @@ const encodeWAV = (samples: Float32Array, sampleRate: number): Blob => {
     return new Blob([view], { type: 'audio/wav' });
 };
 
-const transcribeWithWitAi = async (audioBlob: Blob): Promise<string> => {
-    // We strictly use audio/wav now to prevent 400 Bad Request from Wit.ai
+/**
+ * تقليل معدل العينات (downsample) من معدل المصدر إلى المعدل المطلوب
+ */
+const downsample = (buffer: Float32Array, inputRate: number, outputRate: number): Float32Array => {
+    if (inputRate === outputRate) return buffer;
+    if (inputRate < outputRate) throw new Error('Input rate must be >= output rate');
+
+    const ratio = inputRate / outputRate;
+    const newLength = Math.round(buffer.length / ratio);
+    const result = new Float32Array(newLength);
+
+    for (let i = 0; i < newLength; i++) {
+        const index = Math.round(i * ratio);
+        result[i] = buffer[Math.min(index, buffer.length - 1)];
+    }
+
+    return result;
+};
+
+/**
+ * إرسال مقطع WAV إلى Wit.ai واستقبال النص
+ */
+const transcribeWithWitAi = async (wavBlob: Blob): Promise<string> => {
     const response = await fetch('https://api.wit.ai/speech?v=20240101', {
         method: 'POST',
         headers: {
             'Authorization': `Bearer ${WIT_AI_TOKEN}`,
             'Content-Type': 'audio/wav',
         },
-        body: audioBlob,
+        body: wavBlob,
     });
 
     if (!response.ok) {
-        console.error('Wit.ai API error:', response.status, response.statusText);
+        const errorBody = await response.text().catch(() => '');
+        console.error('Wit.ai API error:', response.status, response.statusText, errorBody);
         return '';
     }
 
     // Wit.ai /speech endpoint يرجع استجابة NDJSON (سطور JSON متعددة)
-    // نأخذ آخر سطر يحتوي على النص النهائي
     const responseText = await response.text();
     const lines = responseText.trim().split('\n').filter(Boolean);
 
@@ -98,7 +128,6 @@ const transcribeWithWitAi = async (audioBlob: Blob): Promise<string> => {
     for (const line of lines) {
         try {
             const parsed = JSON.parse(line);
-            // نأخذ النص النهائي (is_final: true) أو آخر نص متاح
             if (parsed.text) {
                 finalText = parsed.text;
             }
@@ -119,16 +148,17 @@ export const useWitAiTracker = ({
     const [isListening, setIsListening] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
 
-    // استخدام refs لتجنب re-renders ولضمان استقرار الـ callbacks
+    // refs لتجنب re-renders
     const currentIndexRef = useRef(0);
     const expectedWordsRef = useRef(expectedWords);
-    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const mediaStreamRef = useRef<MediaStream | null>(null);
-    const chunksRef = useRef<Blob[]>([]);
+    const audioContextRef = useRef<AudioContext | null>(null);
+    const processorRef = useRef<ScriptProcessorNode | null>(null);
+    const pcmBufferRef = useRef<Float32Array[]>([]);
     const chunkTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const isListeningRef = useRef(false);
+    const isSendingRef = useRef(false);
 
-    // تحديث الـ refs عند تغيّر القيم
     useEffect(() => {
         expectedWordsRef.current = expectedWords;
     }, [expectedWords]);
@@ -151,7 +181,6 @@ export const useWitAiTracker = ({
 
         let matchedCount = 0;
 
-        // محاولة مطابقة الكلمات المنطوقة مع المتوقعة بالترتيب
         for (const spokenWord of spokenWords) {
             const targetIndex = localIndex + matchedCount;
             if (targetIndex >= localExpected.length) break;
@@ -162,12 +191,11 @@ export const useWitAiTracker = ({
                 matchedCount++;
                 onWordMatch?.(targetIndex);
             } else {
-                // محاولة البحث في نافذة صغيرة للأمام (تخطي كلمة أو كلمتين)
+                // بحث في نافذة صغيرة للأمام
                 let foundAhead = false;
                 const searchWindow = Math.min(3, localExpected.length - targetIndex);
                 for (let offset = 1; offset < searchWindow; offset++) {
                     if (fuzzyMatchWords(spokenWord, localExpected[targetIndex + offset])) {
-                        // تخطي الكلمات المفقودة
                         matchedCount += offset + 1;
                         foundAhead = true;
                         break;
@@ -175,7 +203,6 @@ export const useWitAiTracker = ({
                 }
 
                 if (!foundAhead) {
-                    // إذا لم يتم العثور على تطابق، نبلغ عن عدم التطابق
                     onWordMismatch?.(targetIndex);
                 }
             }
@@ -191,35 +218,45 @@ export const useWitAiTracker = ({
      * إرسال المقطع الصوتي المجمّع إلى Wit.ai
      */
     const sendChunkToWitAi = useCallback(async () => {
-        if (chunksRef.current.length === 0) return;
+        if (pcmBufferRef.current.length === 0 || isSendingRef.current) return;
 
-        const mimeType = mediaRecorderRef.current?.mimeType || 'audio/webm';
-        const rawBlob = new Blob(chunksRef.current, { type: mimeType });
-        chunksRef.current = [];
+        // تجميع كل المقاطع في مصفوفة واحدة
+        const totalLength = pcmBufferRef.current.reduce((acc, buf) => acc + buf.length, 0);
+        if (totalLength < 1000) return; // تجاهل المقاطع القصيرة جداً
 
-        if (rawBlob.size < 1000) return;
+        const combined = new Float32Array(totalLength);
+        let offset = 0;
+        for (const buf of pcmBufferRef.current) {
+            combined.set(buf, offset);
+            offset += buf.length;
+        }
+        pcmBufferRef.current = [];
 
+        isSendingRef.current = true;
         setIsLoading(true);
         try {
-            // تحويل الملف إلى WAV لتجنب خطأ 400 من Wit.ai
-            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
-            const arrayBuffer = await rawBlob.arrayBuffer();
-            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-            const wavBlob = encodeWAV(audioBuffer.getChannelData(0), audioBuffer.sampleRate);
+            // تقليل معدل العينات إلى 16000 Hz
+            const inputSampleRate = audioContextRef.current?.sampleRate || 44100;
+            const downsampled = downsample(combined, inputSampleRate, SAMPLE_RATE);
+            const wavBlob = encodeWAV(downsampled, SAMPLE_RATE);
+
+            console.log(`📤 إرسال ${(wavBlob.size / 1024).toFixed(1)} KB WAV إلى Wit.ai`);
 
             const text = await transcribeWithWitAi(wavBlob);
             if (text) {
+                console.log('📝 Wit.ai:', text);
                 processTranscription(text);
             }
         } catch (error) {
             console.error('Error transcribing with Wit.ai:', error);
         } finally {
+            isSendingRef.current = false;
             setIsLoading(false);
         }
     }, [processTranscription]);
 
     /**
-     * بدء الاستماع وتسجيل الصوت
+     * بدء الاستماع وتسجيل الصوت عبر AudioContext (PCM مباشر)
      */
     const start = useCallback(async () => {
         if (isListeningRef.current) return;
@@ -233,66 +270,43 @@ export const useWitAiTracker = ({
             const stream = await navigator.mediaDevices.getUserMedia({
                 audio: {
                     channelCount: 1,
-                    sampleRate: 16000,
                     echoCancellation: true,
                     noiseSuppression: true,
                 },
             });
             mediaStreamRef.current = stream;
 
-            // تحديد نوع الملف الصوتي المدعوم
-            const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-                ? 'audio/webm;codecs=opus'
-                : MediaRecorder.isTypeSupported('audio/webm')
-                    ? 'audio/webm'
-                    : MediaRecorder.isTypeSupported('audio/mp4')
-                        ? 'audio/mp4'
-                        : '';
+            // إنشاء AudioContext لالتقاط PCM مباشرة
+            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+            audioContextRef.current = audioContext;
 
-            const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-            mediaRecorderRef.current = recorder;
+            const source = audioContext.createMediaStreamSource(stream);
 
-            // جمع الـ chunks أثناء التسجيل
-            recorder.ondataavailable = (event: BlobEvent) => {
-                if (event.data.size > 0) {
-                    chunksRef.current.push(event.data);
-                }
+            // ScriptProcessorNode لالتقاط العينات الخام
+            const processor = audioContext.createScriptProcessor(4096, 1, 1);
+            processorRef.current = processor;
+
+            processor.onaudioprocess = (e: AudioProcessingEvent) => {
+                if (!isListeningRef.current) return;
+                const inputData = e.inputBuffer.getChannelData(0);
+                // نسخ البيانات لأنها ستتغير
+                pcmBufferRef.current.push(new Float32Array(inputData));
             };
 
-            recorder.onstop = () => {
-                // إرسال آخر مقطع عند التوقف
-                if (chunksRef.current.length > 0) {
-                    sendChunkToWitAi();
-                }
-            };
-
-            // بدء التسجيل مع تقسيم البيانات كل ثانية لتجميع أسرع
-            recorder.start(1000);
+            source.connect(processor);
+            processor.connect(audioContext.destination);
 
             // إرسال المقاطع المجمّعة كل CHUNK_INTERVAL_MS
             chunkTimerRef.current = setInterval(() => {
-                if (chunksRef.current.length > 0 && isListeningRef.current) {
-                    // إيقاف مؤقت وإعادة تشغيل لفصل المقاطع
-                    if (mediaRecorderRef.current?.state === 'recording') {
-                        mediaRecorderRef.current.stop();
-                        // إعادة التشغيل بعد فترة قصيرة للسماح بمعالجة المقطع
-                        setTimeout(() => {
-                            if (isListeningRef.current && mediaRecorderRef.current && mediaStreamRef.current) {
-                                try {
-                                    mediaRecorderRef.current.start(1000);
-                                } catch {
-                                    // قد يكون الـ stream قد أُغلق
-                                }
-                            }
-                        }, 100);
-                    }
+                if (isListeningRef.current && pcmBufferRef.current.length > 0) {
+                    sendChunkToWitAi();
                 }
             }, CHUNK_INTERVAL_MS);
 
             isListeningRef.current = true;
             setIsListening(true);
 
-            console.log('🎤 بدأ الاستماع عبر Wit.ai');
+            console.log('🎤 بدأ الاستماع عبر Wit.ai (PCM مباشر)');
         } catch (error) {
             console.error('خطأ في الوصول إلى الميكروفون:', error);
             isListeningRef.current = false;
@@ -315,25 +329,32 @@ export const useWitAiTracker = ({
             chunkTimerRef.current = null;
         }
 
-        // إيقاف التسجيل
-        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-            try {
-                mediaRecorderRef.current.stop();
-            } catch {
-                // تجاهل الخطأ إذا كان التسجيل قد توقف بالفعل
-            }
+        // إرسال آخر مقطع
+        if (pcmBufferRef.current.length > 0) {
+            sendChunkToWitAi();
         }
-        mediaRecorderRef.current = null;
+
+        // إيقاف المعالج
+        if (processorRef.current) {
+            processorRef.current.disconnect();
+            processorRef.current = null;
+        }
+
+        // إغلاق AudioContext
+        if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+            audioContextRef.current.close().catch(() => { });
+            audioContextRef.current = null;
+        }
 
         // إيقاف جميع المسارات الصوتية
         mediaStreamRef.current?.getTracks().forEach(track => track.stop());
         mediaStreamRef.current = null;
 
-        // تنظيف المقاطع
-        chunksRef.current = [];
+        // تنظيف البفر
+        pcmBufferRef.current = [];
 
         console.log('🔇 توقف الاستماع');
-    }, []);
+    }, [sendChunkToWitAi]);
 
     /**
      * إعادة تعيين الفهرس
