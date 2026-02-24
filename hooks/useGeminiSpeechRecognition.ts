@@ -45,7 +45,7 @@ export const useGeminiSpeechRecognition = ({
     // Strict Request Queue to prevent parallel API calls and handle 429
     const isProcessingQueueRef = useRef(false);
     const requestQueueRef = useRef<{ blob: Blob, seq: number }[]>([]);
-    const backoffDelayRef = useRef(1000); // 1 second initial backoff
+    const lastRequestTimeRef = useRef(0); // Track exactly when we last pinged Gemini
 
     useEffect(() => { expectedWordsRef.current = expectedWords; }, [expectedWords]);
     useEffect(() => { currentIndexRef.current = currentIndex; }, [currentIndex]);
@@ -145,6 +145,18 @@ export const useGeminiSpeechRecognition = ({
                     }
                 };
 
+                // Rate limiting strategy: Gemini Free Tier allows 15 RPM = 1 request exactly every 4000ms.
+                // We enforce a hard minimum gap of 4100ms between EVERY request.
+                const now = Date.now();
+                const timeSinceLastRequest = now - lastRequestTimeRef.current;
+                const timeToWait = Math.max(0, 4100 - timeSinceLastRequest);
+
+                if (timeToWait > 0) {
+                    await new Promise(resolve => setTimeout(resolve, timeToWait));
+                }
+
+                lastRequestTimeRef.current = Date.now();
+
                 const response = await fetch(GEMINI_API_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -153,21 +165,14 @@ export const useGeminiSpeechRecognition = ({
 
                 if (!response.ok) {
                     if (response.status === 429) {
-                        console.warn(`تم تجاوز الحد المسموح للطلبات (429). ننتظر ${backoffDelayRef.current / 1000} ثانية...`);
-                        // Wait for backoff duration without removing from queue
-                        await new Promise(resolve => setTimeout(resolve, backoffDelayRef.current));
-
-                        // Exponential backoff up to 10 seconds max
-                        backoffDelayRef.current = Math.min(backoffDelayRef.current * 1.5, 10000);
+                        console.warn(`تم تجاوز الحد المسموح للطلبات (429). سنحاول مجدداً بعد 5 ثوانٍ.`);
+                        lastRequestTimeRef.current = Date.now() + 5000; // Force an extra 5s delay
                         continue; // Retry the same request
                     } else {
                         console.error("خطأ في الاتصال بالخادم:", response.status);
                         throw new Error(`HTTP Error: ${response.status}`);
                     }
                 }
-
-                // Request succeeded, reset backoff
-                backoffDelayRef.current = 1000;
 
                 // Remove item from queue only on success or permanent error
                 requestQueueRef.current.shift();
@@ -191,8 +196,8 @@ export const useGeminiSpeechRecognition = ({
                     latestProcessedSeqRef.current = nextSeq;
                 }
 
-                // Small delay between successful requests to be nice to the API
-                await new Promise(resolve => setTimeout(resolve, 500));
+                // Small delay to let React process words nicely
+                await new Promise(resolve => setTimeout(resolve, 100));
 
             } catch (e) {
                 console.error("Gemini API error:", e);
@@ -218,10 +223,11 @@ export const useGeminiSpeechRecognition = ({
     const startRecordingLoop = useCallback(() => {
         if (!isListeningRef.current || !streamRef.current) return;
 
-        // Use slightly larger 8s chunks, step 6s to reduce request volume further
-        // 60 / 6 = 10 requests per minute total
-        const CHUNK_DURATION = 8000;
-        const STEP_DURATION = 6000;
+        // Use 4s chunks, step 4s
+        // 60 / 4 = 15 requests per minute exactly.
+        // Queue will natively space them out to be 4100ms apart safely.
+        const CHUNK_DURATION = 4000;
+        const STEP_DURATION = 4000;
 
         const loop = () => {
             if (!isListeningRef.current) return;
@@ -284,7 +290,7 @@ export const useGeminiSpeechRecognition = ({
             }
 
             requestQueueRef.current = [];
-            backoffDelayRef.current = 1000;
+            lastRequestTimeRef.current = 0;
             isProcessingQueueRef.current = false;
 
             const stream = await navigator.mediaDevices.getUserMedia({
@@ -320,6 +326,7 @@ export const useGeminiSpeechRecognition = ({
         recordersRef.current = [];
 
         requestQueueRef.current = [];
+        lastRequestTimeRef.current = 0;
         isProcessingQueueRef.current = false;
 
         if (streamRef.current) {
